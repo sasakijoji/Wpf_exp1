@@ -1,6 +1,7 @@
 ﻿using Microsoft.SqlServer.Server;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Entity;
@@ -91,12 +92,32 @@ namespace Wpf_exp1
         public MainWindow()
         {
             InitializeComponent();
+            this.InitializeButtons(); // ボタンの初期化
+            this.InitializeTextBoxes(); // テキストボックスの初期化
+
+            ///UIにてファイルの内容を表示
+            DisplayData();
+            this.ClientDataGrid.SelectionMode = DataGridSelectionMode.Single; // 単一選択モードに設定
+     
+        }
+        /// <summary>
+        /// ボタンの初期化
+        /// </summary>
+        private void InitializeButtons()
+        {
             this.btnRegistration.IsEnabled = false;//登録ボタンの無効化
+            this.btnCancel.IsEnabled = false;//キャンセルボタンの無効化 
+            this.btnEdit.IsEnabled = false; // 編集ボタンの無効化
+            this.btnDelete.IsEnabled = false; // 削除ボタンの無効化
+        }
+        /// <summary>
+        /// テキストボックスの初期化
+        /// </summary>
+        private void InitializeTextBoxes()
+        {
             txtbox_Name.IsEnabled = false;
             txtbox_Address.IsEnabled = false;
             txtbox_Age.IsEnabled = false;
-            ///UIにてファイルの内容を表示
-            DisplayData();
         }
         /// <summary>
         /// データの画面表示
@@ -149,18 +170,7 @@ namespace Wpf_exp1
         private void TextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
         }
-        /// <summary>
-        /// ファイル名の取得
-        /// </summary>
-        /// <returns>ファイル名を戻り値として返す</returns>
-        private static string GetFileName() 
-        {
-            //カレントディレクトリを取得
-            string currentDirectory = Directory.GetCurrentDirectory();
-            //ファイル名生成
-            string fileName = currentDirectory + "\\UserDataOriginal.csv";
-            return fileName; 
-        }
+
 
         /// <summary>
         /// 年齢が数値かどうかのチェック
@@ -174,14 +184,11 @@ namespace Wpf_exp1
             {
                 //年齢チェック承認
                 return true;
-                //Console.WriteLine($"'{input}' は小数点なしの整数です。");
             }
             else
             {
                 //年齢チェック却下
-                MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;
-                //Console.WriteLine($"'{input}' は小数点なしの整数ではありません。");
             }
         }
         /// <summary>
@@ -192,15 +199,27 @@ namespace Wpf_exp1
         private void btnRegistration_Click(object sender, RoutedEventArgs e)
         {
             this.userName = this.txtbox_Name.Text;
+            if (string.IsNullOrEmpty(this.userName))
+            {
+                MessageBox.Show("名前を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                return; // 名前が未入力であれば処理を抜ける
+            }
+
             this.age = this.txtbox_Age.Text;
             //TODO: 名前のNUllチェックも入れる
 
             //年齢の型チェック
             if (!this.CheckAge(this.age))
             {
+                MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;//年齢認証却下でであれば処理を抜ける
             }
             this.address = this.txtbox_Address.Text;
+            if (this.address == null || this.address == "")
+            {
+                MessageBox.Show("住所を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                return; // 住所が未入力であれば処理を抜ける
+            }
 
             // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
@@ -224,39 +243,88 @@ namespace Wpf_exp1
                 ///UIにてファイルの内容を表示
                 ClientDataGrid.Columns.Clear(); 
                 DisplayData();
+                //textboxコンストラクタ
+                this.txtbox_Name.Text = "";
+                this.txtbox_Age.Text = "";
+                this.txtbox_Address.Text = "";
+                MessageBox.Show("データの登録が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
+                this.btnDelete.IsEnabled = true;
+                this.btnEdit.IsEnabled = true;
+                this.btnNewData.IsEnabled = true;
             }
             else
             {
                 Console.WriteLine("データの挿入に失敗しました。");
             }
-            //textboxコンストラクタ
-            this.txtbox_Name.Text = "";
-            this.txtbox_Age.Text = "";
-            this.txtbox_Address.Text = "";
-            
+
         }
-        /// <summary>
-        /// 編集ボタンクリックイベント
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void btnEdit_Click(object sender, RoutedEventArgs e)
-        {
-            this.btnRegistration.IsEnabled = true;//登録ボタンの有効化
-        }
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void ClientDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ClientDataGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
         {
-            //FIXME: 型変換処理してないのでエラーが起きる
+            // HACK: FIXME: 型変換処理してないのでエラーが起きる
+            this.btnEdit.IsEnabled = true; // 編集ボタンの有効化
+            this.btnDelete.IsEnabled = true; // 削除ボタンの有効化
+
             if (ClientDataGrid.SelectedItem != null)
             {
                 var selectedRow = (DataRowView)ClientDataGrid.SelectedItem;
-                txtbox_Name.Text = selectedRow.Row["client_name"].ToString(); // "ColumnName" を表示したい列名に置き換えてください
+                this.txtbox_Name.Text = selectedRow.Row["client_name"].ToString(); // 名前
+                this.txtbox_Age.Text = selectedRow.Row["client_age"].ToString(); // 年齢
+                this.txtbox_Address.Text = selectedRow.Row["client_address"].ToString(); // 住所
             }
+        }
+        /// <summary>
+        /// 新規データ登録ボタンのクリックイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void btnNewData_Click(object sender, RoutedEventArgs e)
+        {
+            this.txtbox_Name.Focus(); // 名前のテキストボックスにフォーカスを当てる
+            this.txtbox_Name.CaretIndex = this.txtbox_Name.Text.Length; // テキストボックスのカーソルを最後に移動
+            this.btnRegistration.IsEnabled = true;//登録ボタンの有効化
+            this.btnCancel.IsEnabled = true; // キャンセルボタンの有効化
+            this.btnNewData.IsEnabled = false; // 新規データ登録ボタンの無効化
+            this.btnEdit.IsEnabled = false; // 編集ボタンの無効化
+            this.btnDelete.IsEnabled = false; // 削除ボタンの無効化
+            //  textboxの有効化
+            txtbox_Name.IsEnabled = true;
+            txtbox_Address.IsEnabled = true;
+            txtbox_Age.IsEnabled = true;
+            //textboxコンストラクタ
+            this.txtbox_Name.Text = "";
+            this.txtbox_Age.Text = "";
+            this.txtbox_Address.Text = "";
+            this.ClientDataGrid.SelectedItem = null; // 選択をクリア
+            this.ClientDataGrid.IsEnabled = false; // DataGridの無効化
+        }
+        /// <summary>
+        /// 削除ボタンのクリックイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void btnDelete_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+        /// <summary>
+        /// キャンセルボタンのクリックイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void btnCancel_Click(object sender, RoutedEventArgs e)
+        {
+                this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
+                this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化
+                this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
+                this.ClientDataGrid.IsEnabled = true; // DataGridの無効化
+                this.InitializeTextBoxes(); // テキストボックスの初期化
+
         }
     }
 }
