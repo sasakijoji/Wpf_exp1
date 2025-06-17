@@ -5,8 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wpf_exp1"
         mc:Ignorable="d"
-        Title="LoginWindow" Height="450" Width="800">
-    <Grid>
-        
+        Title="LoginWindow" Height="219" Width="383">
+    <Grid RenderTransformOrigin="0.513,0.501">
+        <TextBox x:Name="txtbox_UserName" HorizontalAlignment="Center" Margin="0,61,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="237"/>
+        <TextBox x:Name="txtbox_PassWord" HorizontalAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Top" Width="237" Margin="0,111,0,0"/>
+        <Label x:Name="lbl_UserName" Content="ユーザーネーム" HorizontalAlignment="Left" Margin="73,35,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="lbl_Password" Content="パスワード" HorizontalAlignment="Left" Margin="71,84,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.074,0.506"/>
+        <Button x:Name="btn_Login" Content="ログイン" HorizontalAlignment="Left" Margin="95,147,0,0" VerticalAlignment="Top" Width="65" Click="btn_Login_Click"/>
+        <Button x:Name="btn_quit" Content="終了" HorizontalAlignment="Left" Margin="211,147,0,0" VerticalAlignment="Top" Width="65" Click="btn_quit_Click"/>
+
     </Grid>
 </Window>
