@@ -60,21 +60,41 @@ namespace Wpf_exp1
         /// <returns>影響を受けた行数。</returns>
         public int SetData(string commandText, params SqlParameter[] parameters)
         {
-            //TODO: 例外処理を入れる
             int rowsAffected = 0;
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                connection.Open();
-                using (SqlCommand command = new SqlCommand(commandText, connection))
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
-                    // パラメーターを追加
-                    if (parameters != null)
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(commandText, connection))
                     {
-                        command.Parameters.AddRange(parameters);
+                        // パラメータを追加
+                        if (parameters != null)
+                        {
+                            command.Parameters.AddRange(parameters);
+                        }
+                        // SQLコマンドを実行し、影響を受けた行数を取得
+                        rowsAffected = command.ExecuteNonQuery();
                     }
-                    // SQLコマンドを実行し、影響を受けた行数を取得
-                    rowsAffected = command.ExecuteNonQuery();
                 }
+            }
+            catch (SqlException ex)
+            {
+                // SQL関連のエラー処理
+                //LogError(ex);
+                throw new ApplicationException("データベース操作中にエラーが発生しました。", ex);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // 接続状態やコマンドの状態に関連するエラー処理
+                //LogError(ex);
+                throw new ApplicationException("データベース接続の状態に問題があります。", ex);
+            }
+            catch (Exception ex)
+            {
+                // その他の一般的なエラー処理
+                //LogError(ex);
+                throw new ApplicationException("予期しないエラーが発生しました。", ex);
             }
             return rowsAffected;
         }
@@ -86,16 +106,19 @@ namespace Wpf_exp1
     /// </summary>
     public partial class MainWindow : Window
     {
-        private string userName = "";// 名前
-        private string age = "";//年齢
-        private string address = "";//住所
+        //private string userName = "";// 名前
+        //private string age = "";//年齢
+        //private string address = "";//住所
         // 新規か登録かのモードを定義    
         private const int NEW_MODE = 0; // 新規登録モード
         private const int EDIT_MODE = 1; // 編集モード
         private int editMode = NEW_MODE; // 編集モードのフラグ（0: 新規登録, 1: 編集）
-       /// <summary>
-       /// 
-       /// </summary>
+      　//カレントIDを保持する変数
+        private int currentId = 0; // 現在のIDを保持する変数
+
+        /// <summary>
+        /// 
+        /// </summary>
         public MainWindow()
         {
             InitializeComponent();
@@ -207,35 +230,18 @@ namespace Wpf_exp1
         {
             if (this.editMode == MainWindow.NEW_MODE)
             {
-                RegistrationData(); // 新規登録処理を呼び出す
+                InsertClientData(); // 新規登録処理を呼び出す
             }
             else {
+                EditClientData(); // 編集処理を呼び出す  
             }
         }
         /// <summary>
         /// sqlServerへのデータ新規登録処理
         /// </summary>
-        private void RegistrationData()
+        private void InsertClientData()
         {
-            this.userName = this.txtbox_Name.Text;
-            if (string.IsNullOrEmpty(this.userName))
-            {
-                MessageBox.Show("名前を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return; // 名前が未入力であれば処理を抜ける
-            }
-            this.age = this.txtbox_Age.Text;
-            //年齢の型チェック
-            if (!this.CheckAge(this.age))
-            {
-                MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;//年齢認証却下でであれば処理を抜ける
-            }
-            this.address = this.txtbox_Address.Text;
-            if (this.address == null || this.address == "")
-            {
-                MessageBox.Show("住所を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return; // 住所が未入力であれば処理を抜ける
-            }
+            this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
             // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
             // 挿入するSQLコマンドを定義
@@ -266,10 +272,138 @@ namespace Wpf_exp1
             }
             else
             {
+                MessageBox.Show("データの登録に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
                 Console.WriteLine("データの挿入に失敗しました。");
             }
         }
+        /// <summary>
+        /// 削除ボタンクリックイベント
+        /// </summary>
+        private void DeleteClientData()
+        {
 
+            // SqlServerDataAccess クラスのインスタンスを生成
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+
+            // 削除する SQL コマンドを定義
+            string deleteQuery = "DELETE FROM baseData WHERE client_name = @Name AND client_age = @Age AND client_address = @Address";
+
+            // パラメーターを作成
+            SqlParameter[] deleteParams = new SqlParameter[]
+            {
+             new SqlParameter("@Name", this.txtbox_Name.Text), // 名前
+             new SqlParameter("@Age", this.txtbox_Age.Text),   // 年齢
+             new SqlParameter("@Address", this.txtbox_Address.Text) // 住所
+            };
+
+            // SetData 関数を呼び出して削除を実行
+            int affectedRows = dataAccess.SetData(deleteQuery, deleteParams);
+
+            if (affectedRows > 0)
+            {
+                Console.WriteLine($"{affectedRows} 行が削除されました。");
+                // UI にてデータを再表示
+                ClientDataGrid.Columns.Clear();
+                DisplayData();
+
+                // テキストボックスをクリア
+                this.txtbox_Name.Text = "";
+                this.txtbox_Age.Text = "";
+                this.txtbox_Address.Text = "";
+
+                MessageBox.Show("データの削除が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show("データの削除に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
+                Console.WriteLine("データの削除に失敗しました。");
+            }
+        }
+        /// <summary>
+        /// sqlServerへのデータ更新処理
+        /// </summary>
+        private void EditClientData()
+        {
+            if (this.currentId == 0) // 現在のIDが0の場合は何も更新しない
+            {
+                MessageBox.Show("更新するデータが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
+
+            // SqlServerDataAccess クラスのインスタンスを生成
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+
+            // 現在のIDを使用して更新するSQLコマンドを定義
+            // 更新するSQLコマンドを定義
+            string updateQuery = "UPDATE baseData SET client_name = @Name, client_age = @Age, client_address = @Address where client_id = "+ this.currentId ;
+
+            // パラメーターを作成
+            SqlParameter[] updateParams = new SqlParameter[]
+            {
+                new SqlParameter("@Name", this.txtbox_Name.Text), // 名前
+                new SqlParameter("@Age", this.txtbox_Age.Text),   // 年齢
+                new SqlParameter("@Address", this.txtbox_Address.Text), // 住所
+            };
+
+            // SetData 関数を呼び出して更新を実行
+            int affectedRows = dataAccess.SetData(updateQuery, updateParams);
+
+            if (affectedRows > 0)
+            {
+                Console.WriteLine($"{affectedRows} 行が更新されました。");
+
+                // UI にてファイルの内容を表示
+                ClientDataGrid.Columns.Clear();
+                DisplayData();
+
+                // テキストボックスをクリア
+                this.txtbox_Name.Text = "";
+                this.txtbox_Age.Text = "";
+                this.txtbox_Address.Text = "";
+       
+
+                MessageBox.Show("データの更新が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // ボタンの有効化
+                this.btnDelete.IsEnabled = true;
+                this.btnEdit.IsEnabled = true;
+                this.btnNewData.IsEnabled = true;
+                this.ClientDataGrid.IsEnabled = true; // DataGridの有効化
+                this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化
+                this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
+            }
+            else
+            {
+                MessageBox.Show("データの更新に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
+                Console.WriteLine("データの更新に失敗しました。");
+            }
+        }
+
+        /// <summary>
+        /// checkTextBoxInputメソッドは、テキストボックスの入力内容を検証します。
+        /// </summary>
+        private void CheckTextBoxInput()
+        {
+            // 名前が未入力であれば処理を抜ける
+            if (string.IsNullOrEmpty(this.txtbox_Name.Text))
+            {
+                MessageBox.Show("名前を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                return; // 名前が未入力であれば処理を抜ける
+            }
+            //年齢の型チェック
+            if (!this.CheckAge(this.txtbox_Age.Text))
+            {
+                MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;//年齢認証却下でであれば処理を抜ける
+            }
+            // 住所が未入力であれば処理を抜ける
+            if (string.IsNullOrEmpty(this.txtbox_Address.Text))
+            {
+                MessageBox.Show("住所を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                return; // 住所が未入力であれば処理を抜ける
+            }
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -289,6 +423,7 @@ namespace Wpf_exp1
                 this.txtbox_Name.Text = selectedRow.Row["client_name"].ToString(); // 名前
                 this.txtbox_Age.Text = selectedRow.Row["client_age"].ToString(); // 年齢
                 this.txtbox_Address.Text = selectedRow.Row["client_address"].ToString(); // 住所
+                this.currentId = Convert.ToInt32(selectedRow.Row["client_id"]); // 現在のIDを取得
             }
         }
         /// <summary>
@@ -324,7 +459,7 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnDelete_Click(object sender, RoutedEventArgs e)
         {
-
+            this.DeleteClientData(); // 削除処理を呼び出す
         }
         /// <summary>
         /// キャンセルボタンのクリックイベント
