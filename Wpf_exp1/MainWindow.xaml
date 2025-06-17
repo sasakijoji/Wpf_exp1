@@ -22,8 +22,8 @@
         <TextBox x:Name="txtbox_Address" HorizontalAlignment="Left" Margin="137,158,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="2"/>
         <Label x:Name="label_Nameコピー__C_コピー__C_" Content="住所" HorizontalAlignment="Left" Margin="64,154,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.107,-0.884" Width="55"/>
         <DataGrid x:Name="ClientDataGrid" Grid.Column="1" d:ItemsSource="{d:SampleData ItemCount=5}" Grid.ColumnSpan="2" Margin="123,10,10,13" AutoGenerateColumns="False" SelectedCellsChanged="ClientDataGrid_SelectedCellsChanged" EnableRowVirtualization="False" IsReadOnly="True"/>
-        <Button x:Name="btnEdit" Content="編集" HorizontalAlignment="Left" Margin="194,342,0,0" VerticalAlignment="Top" RenderTransformOrigin="1.069,0.652" Grid.ColumnSpan="2"/>
-        <Button x:Name="btnNewData" Content="新規" HorizontalAlignment="Left" Margin="143,342,0,0" VerticalAlignment="Top" Click="btnNewData_Click"/>
+        <Button x:Name="btnEdit" Content="編集" HorizontalAlignment="Left" Margin="194,342,0,0" VerticalAlignment="Top" RenderTransformOrigin="1.069,0.652" Grid.ColumnSpan="2" Click="btnEdit_Click"/>
+        <Button x:Name="btnNewData" Content="新規" Margin="143,342,37,0" VerticalAlignment="Top" Click="btnNewData_Click"/>
         <Button x:Name="btnDelete" Content="削除" HorizontalAlignment="Left" Margin="38,342,0,0" VerticalAlignment="Top" Click="btnDelete_Click" RenderTransformOrigin="1.349,0.605" Grid.Column="1"/>
         <Button x:Name="btnCancel" Content="取消" HorizontalAlignment="Left" Margin="0,380,0,0" VerticalAlignment="Top" Width="28" RenderTransformOrigin="0.703,-0.986" Grid.Column="1" Click="btnCancel_Click"/>
     </Grid>
