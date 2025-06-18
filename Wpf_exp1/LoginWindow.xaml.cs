@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
@@ -20,15 +21,17 @@ namespace Wpf_exp1
     /// </summary>
     public partial class LoginWindow : Window
     {
-        private string UserName { get; set; }
-        private string Password { get; set; }
+        private DataTable DataTable { get; set; } = new DataTable(); // 修正: プロパティを初期化
+        private string UserName { get; set; } = string.Empty; // 修正: プロパティを初期化
+        private string Password { get; set; } = string.Empty; // 修正: プロパティを初期化
+
         public LoginWindow()
         {
             InitializeComponent();
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-            this.UserName = "jojisasaki";
-            this.Password = "ilverde00"; //
-            dataAccess.GetUserID(this.UserName,this.Password);
+
+            // ユーザーをデータベースに挿入
+            //SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            //dataAccess.InsertUser("user2", "ilverde00");
         }
         /// <summary>
         /// ログインボタンをクリックしたときの処理
@@ -37,7 +40,16 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btn_Login_Click(object sender, RoutedEventArgs e)
         {
-            // todo: ログイン処理を実装する
+            this.UserName = this.txtbox_UserName.Text.Trim(); // ユーザー名を取得
+            this.Password = this.txtbox_PassWord.Text.Trim(); // パスワードを取得
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            DataTable = dataAccess.GetUserID(this.UserName, this.Password);
+            if (DataTable.Rows.Count <= 0)
+            {
+                MessageBox.Show("ユーザー名またはパスワードが正しくありません。",
+                    "ログイン失敗", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
             MainWindow mainWindow = new MainWindow();
             mainWindow.Show();
             this.Close();
@@ -51,39 +63,5 @@ namespace Wpf_exp1
         {
             Application.Current.Shutdown();
         }
-        //private bool ConfirmUserAccount(string userName, string password)
-        //{
-        //    // ここでユーザー名とパスワードを確認する処理を実装する
-        //    // 例えば、データベースやファイルからの確認など
-        //    // 確認が成功した場合はtrueを返し、失敗した場合はfalseを返す
-        //    // ここでは仮の実装として常にtrueを返す
-        //    using (SqlConnection connection = new SqlConnection(connectionString))
-        //    {
-        //        string query = "SELECT PasswordHash FROM Users WHERE UserName = @UserName";
-        //        SqlCommand command = new SqlCommand(query, connection);
-        //        command.Parameters.AddWithValue("@UserName", "user1");
-        //        connection.Open();
-        //        var result = command.ExecuteScalar();
-        //        if (result != null)
-        //        {
-        //            string storedHash = result.ToString();
-        //            string enteredHash = Convert.ToBase64String(HashPassword("entered_password"));
-        //            if (storedHash == enteredHash)
-        //            {
-        //                // 認証成功
-        //            }
-        //            else
-        //            {
-        //                // 認証失敗
-        //            }
-        //        }
-        //        else
-        //        {
-        //            // ユーザーが存在しない
-        //        }
-        //    }
-
-        //    return true;
-        //}
     }
 }
