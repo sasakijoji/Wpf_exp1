@@ -50,7 +50,7 @@ namespace Wpf_exp1
                     "ログイン失敗", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-            MainWindow mainWindow = new MainWindow();
+            MainWindow mainWindow = new MainWindow(this.UserName);
             mainWindow.Show();
             this.Close();
         }

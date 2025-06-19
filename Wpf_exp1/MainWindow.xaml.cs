@@ -40,12 +40,16 @@ namespace Wpf_exp1
         private int editMode = NEW_MODE; // 編集モードのフラグ（0: 新規登録, 1: 編集）
       　//カレントIDを保持する変数
         private int currentId = 0; // 現在のIDを保持する変数
+        private bool beginEdit = false; // 編集開始フラグ
+        private string userName;
 
         /// <summary>
-        /// 
+        /// メイン画面
         /// </summary>
-        public MainWindow()
+        /// <param name="userName">ログインユーザーの名前</param>
+        public MainWindow(string userName)
         {
+            this.userName = userName;
             InitializeComponent();
             this.InitializeButtons(); // ボタンの初期化
             this.InitializeTextBoxes(); // テキストボックスの初期化
@@ -53,7 +57,6 @@ namespace Wpf_exp1
             ///UIにてファイルの内容を表示
             DisplayData();
             this.ClientDataGrid.SelectionMode = DataGridSelectionMode.Single; // 単一選択モードに設定
-     
         }
         /// <summary>
         /// ボタンの初期化
@@ -167,22 +170,10 @@ namespace Wpf_exp1
         private void InsertClientData()
         {
             this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
-            // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-            // 挿入するSQLコマンドを定義
-            string insertQuery = "INSERT INTO baseData (client_name, client_age, client_address) VALUES (@Name, @Age, @Address)";
-            // パラメーターを作成
-            SqlParameter[] insertParams = new SqlParameter[]
+            if (dataAccess.InsertClientData(this.txtbox_Name.Text.Trim(),
+                this.txtbox_Age.Text.Trim(),this.txtbox_Address.Text.Trim()))
             {
-                new SqlParameter("@Name", this.txtbox_Name.Text),//名前
-                new SqlParameter("@Age", this.txtbox_Age.Text), // 例: 年齢
-                new SqlParameter("@Address", this.txtbox_Address.Text) // 住所
-            };
-            // SetData関数を呼び出して挿入を実行
-            int affectedRows = dataAccess.SetData(insertQuery, insertParams);
-            if (affectedRows > 0)
-            {
-                Console.WriteLine($"{affectedRows} 行が挿入されました。");
                 ///UIにてファイルの内容を表示
                 ClientDataGrid.Columns.Clear(); 
                 DisplayData();
@@ -198,7 +189,6 @@ namespace Wpf_exp1
             else
             {
                 MessageBox.Show("データの登録に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
-                Console.WriteLine("データの挿入に失敗しました。");
             }
         }
         /// <summary>
@@ -255,29 +245,13 @@ namespace Wpf_exp1
                 return;
             }
             this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
-
             // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-
-            // 現在のIDを使用して更新するSQLコマンドを定義
-            // 更新するSQLコマンドを定義
-            string updateQuery = "UPDATE baseData SET client_name = @Name, client_age = @Age, client_address = @Address where client_id = "+ this.currentId ;
-
-            // パラメーターを作成
-            SqlParameter[] updateParams = new SqlParameter[]
+            if (dataAccess.EditClientData(this.txtbox_Name.Text.Trim(),
+                this.txtbox_Age.Text.Trim(),
+                this.txtbox_Address.Text.Trim()
+                ,this.currentId))
             {
-                new SqlParameter("@Name", this.txtbox_Name.Text), // 名前
-                new SqlParameter("@Age", this.txtbox_Age.Text),   // 年齢
-                new SqlParameter("@Address", this.txtbox_Address.Text), // 住所
-            };
-
-            // SetData 関数を呼び出して更新を実行
-            int affectedRows = dataAccess.SetData(updateQuery, updateParams);
-
-            if (affectedRows > 0)
-            {
-                Console.WriteLine($"{affectedRows} 行が更新されました。");
-
                 // UI にてファイルの内容を表示
                 ClientDataGrid.Columns.Clear();
                 DisplayData();
@@ -286,10 +260,8 @@ namespace Wpf_exp1
                 this.txtbox_Name.Text = "";
                 this.txtbox_Age.Text = "";
                 this.txtbox_Address.Text = "";
-       
 
                 MessageBox.Show("データの更新が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
-
                 // ボタンの有効化
                 this.btnDelete.IsEnabled = true;
                 this.btnEdit.IsEnabled = true;
@@ -303,6 +275,8 @@ namespace Wpf_exp1
                 MessageBox.Show("データの更新に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
                 Console.WriteLine("データの更新に失敗しました。");
             }
+            dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+
         }
 
         /// <summary>
@@ -336,7 +310,7 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void ClientDataGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
         {
-            // HACK: FIXME: 型変換処理してないのでエラーが起きる
+            
             if (this.btnNewData.IsEnabled == true) //もし新規ボタンが有効なら
             {
                 this.btnEdit.IsEnabled = true; // 編集ボタンの有効化
@@ -398,7 +372,6 @@ namespace Wpf_exp1
                 this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
                 this.ClientDataGrid.IsEnabled = true; // DataGridの無効化
                 this.InitializeTextBoxes(); // テキストボックスの初期化
-
         }
         /// <summary>
         /// 編集ボタンのクリックイベント  
@@ -407,6 +380,12 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
+               SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+               if(dataAccess.CheckIfClientRecordisLocked(this.currentId.ToString(),this.userName)) 
+               {
+                   MessageBox.Show("他ユーザーが編集中です", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                   return;
+               }
                this.editMode = 1; // 編集モードに設定
                this.txtbox_Name.IsEnabled = true; // 名前のテキストボックスを有効化
                this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックスを有効化
@@ -417,6 +396,9 @@ namespace Wpf_exp1
                this.btnNewData.IsEnabled = false; // 新規データ登録ボタンの無効化
                this.btnEdit.IsEnabled = false; // 編集ボタンの無効化
                this.btnDelete.IsEnabled = false; // 削除ボタンの無効化
+
+               this.beginEdit = true; // 編集開始フラグを立てる
+
         }
     }
 }

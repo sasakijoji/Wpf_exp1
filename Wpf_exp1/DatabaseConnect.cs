@@ -5,9 +5,14 @@ using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Net;
+using System.Security.Cryptography; // ハッシュ化のために追加
 using System.Text;
 using System.Threading.Tasks;
-using System.Security.Cryptography; // ハッシュ化のために追加
+using System.Transactions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Xml.Linq;
 
 
 namespace Wpf_exp1
@@ -29,16 +34,24 @@ namespace Wpf_exp1
             return Guid.NewGuid();
         }
     }
-
+    /// <summary>
+    /// サーバーへのデータアクセスを提供するクラスです。
+    /// </summary>
     public class SqlServerDataAccess
     {
+        /// <summary>
+        /// 接続文字列を格納するフィールド
+        /// </summary>
         private readonly string _connectionString;
 
         public SqlServerDataAccess()
         {
             _connectionString = System.Configuration.ConfigurationManager.ConnectionStrings["ClientDataConnection"].ConnectionString;
         }
-
+        /// <summary>
+        /// クライアントのデータを取得します。
+        /// </summary>
+        /// <returns></returns>
         public DataTable GetClientsData()
         {
             DataTable dataTable = new DataTable();
@@ -55,6 +68,202 @@ namespace Wpf_exp1
                 }
             }
             return dataTable;
+        }
+        public DataTable LockClientRecordById(string clientId)
+        {
+            DataTable dataTable = new DataTable();
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                string query = "SELECT * FROM baseData WITH (UPDLOCK, ROWLOCK) WHERE client_id=@ClientId";
+                // パラメーターを作成
+                SqlParameter[] updateParams = new SqlParameter[]
+                {
+                            new SqlParameter("@ClientId", clientId)
+                };
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                    {
+                        adapter.Fill(dataTable);
+                    }
+                }
+            }
+            return dataTable;
+        }
+        /// <summary>
+        /// ロックを取得し、クライアントのレコードが編集中かどうかを確認し、
+        /// かかってなければロックフラグを立てる
+        /// </summary>
+        /// <param name="clientId"></param>
+        /// <param name="userName"></param>
+        /// <returns></returns>
+        public bool CheckIfClientRecordisLocked(string clientId, string userName)
+        {
+            
+            DataTable dataTable = new DataTable();
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                // セッション所有のロックを取得（タイムアウト0で即時取得or失敗）
+                var cmd = new SqlCommand("DECLARE @rv INT;EXEC @rv = sp_getapplock @Resource, 'Exclusive', 'Session', 0", connection);
+                cmd.Parameters.AddWithValue("@Resource", "baseData:" + clientId);
+                var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
+                rvParam.Direction = ParameterDirection.ReturnValue;
+                cmd.ExecuteNonQuery();
+                int rv = (int)rvParam.Value;
+                if (rv < 0)
+                {
+                    //throw new InvalidOperationException("編集中のためロック取得失敗");
+                    return true; // ロックされている場合はtrueを返す
+                }
+                // パラメーターを作成
+                SqlParameter[] updateParams = new SqlParameter[]
+                {
+                      new SqlParameter("@ClientId", clientId),
+                      new SqlParameter("@user", userName)
+                };
+                // todo: FIXME IsEditing フラグテーブルと EditingBy ユーザー名のカラムを作成する必要がある
+      
+                // 編集フラグ更新
+                using (cmd = new SqlCommand(
+                "UPDATE baseData SET IsEditing = 1, EditingBy = @user WHERE client_id = @id",
+                connection))　// HACK: FIXME:  なのでこのSQL文を現在実行するとエラーが発生する。
+                {
+                    // 必ず SqlCommand へパラメーターを登録すること
+                    cmd.Parameters.Add("@user", SqlDbType.NVarChar, 100).Value = userName;
+                    cmd.Parameters.Add("@id", SqlDbType.Int).Value = clientId;
+
+                    int rows = cmd.ExecuteNonQuery();
+                    // rows が 1 以上なら成功
+                    if (rows > 0)
+                    {
+                        //// ロックが成功した場合、データを取得して返す
+                        //cmd.CommandText = "SELECT * FROM baseData WHERE client_id = @id";
+                        //using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                        //{
+                        //    adapter.Fill(dataTable);
+                        //}
+                        //return true; // ロック成功
+                    }
+                    else
+                    {
+                        // 編集フラグの更新に失敗した場合はロックを解放
+                        //cmd.CommandText = "EXEC sp_releaseapplock @Resource, 'Session'";
+                        //cmd.ExecuteNonQuery();
+                    }
+                }
+
+            }
+            return false; // ロックされていない場合はfalseを返す
+        }
+        /// <summary>
+        /// ロック解放処理を行うメソッドです。
+        /// </summary>
+        /// <param name="clientId"></param>
+        /// <returns></returns>
+        public bool ReleaseClientRecordLock(string clientId)
+        {
+            using (SqlConnection connection = new SqlConnection(_connectionString))
+            {
+                // パラメーターを作成
+                SqlParameter[] updateParams = new SqlParameter[]
+                {
+                      new SqlParameter("@ClientId", clientId),
+                };
+                connection.Open();
+                // 編集フラグ解除
+                new SqlCommand("UPDATE baseData SET IsEditing = 0, EditingBy = NULL WHERE client_id = @id", connection)
+                    .ExecuteNonQuery();
+                // ロック解放
+                var cmd = new SqlCommand("EXEC sp_releaseapplock @Resource, 'Session'", connection);
+                cmd.Parameters.AddWithValue("@Resource", "baseData:" + clientId);
+                cmd.ExecuteNonQuery();
+            }
+            return true; // ロック解除成功
+        }
+        /// sqlServerへのデータ新規登録処理
+        /// </summary>
+        public bool InsertClientData(string name, string age, string Address)
+        {
+            // 挿入するSQLコマンドを定義
+            string insertQuery = "INSERT INTO baseData (client_name, client_age, client_address) VALUES (@Name, @Age, @Address)";
+            // パラメーターを作成
+            SqlParameter[] insertParams = new SqlParameter[]
+            {
+                new SqlParameter("@Name", name),//名前
+                new SqlParameter("@Age", age), // 例: 年齢
+                new SqlParameter("@Address", Address) // 住所
+            };
+            // SetData関数を呼び出して挿入を実行
+            int affectedRows = SetData(insertQuery, insertParams);
+            if (affectedRows > 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false; // 挿入が失敗した場合はfalseを返す
+            }
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="age"></param>
+        /// <param name="address"></param>
+        /// <param name="currentId"></param>
+        /// <returns></returns>
+        public bool EditClientData(string name, string age, string address,int currentId) {
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+
+                // トランザクションの開始
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
+                    {
+                        // 更新するSQLコマンドを定義
+                        string updateQuery = @"
+                    UPDATE baseData
+                    SET client_name = @Name, client_age = @Age, client_address = @Address
+                    WHERE client_id = @ClientId";
+
+                        // パラメーターを作成
+                        SqlParameter[] updateParams = new SqlParameter[]
+                        {
+                            new SqlParameter("@Name", name),
+                            new SqlParameter("@Age", age),
+                            new SqlParameter("@Address", address),
+                            new SqlParameter("@ClientId", currentId)
+                        };
+
+                        // 更新を実行
+                        int affectedRows = SetData(updateQuery, updateParams, connection, transaction);
+
+                        if (affectedRows > 0)
+                        {
+                            // コミットして変更を確定
+                            transaction.Commit();
+                            return true;
+                        }
+                        else
+                        {
+                            // 影響を受けた行がない場合はロールバック
+                            transaction.Rollback();
+                            return false;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // エラー発生時はロールバック
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -132,7 +341,6 @@ namespace Wpf_exp1
                     }
                 }
             }
-
             if (storedPasswordHashBytes != null && storedSalt != null)
             {
                 byte[] hashedPasswordFromInputBytes = HashPassword(password, storedSalt);
@@ -213,6 +421,22 @@ namespace Wpf_exp1
                 throw new ApplicationException("予期しないエラーが発生しました。", ex);
             }
             return rowsAffected;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <param name="connection"></param>
+        /// <param name="transaction"></param>
+        /// <returns></returns>
+        private int SetData(string query, SqlParameter[] parameters, SqlConnection connection, SqlTransaction transaction)
+        {
+            using (var command = new SqlCommand(query, connection, transaction))
+            {
+                command.Parameters.AddRange(parameters);
+                return command.ExecuteNonQuery();
+            }
         }
     }
 
