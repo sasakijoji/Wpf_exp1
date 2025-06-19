@@ -100,7 +100,6 @@ namespace Wpf_exp1
         /// <returns></returns>
         public bool CheckIfClientRecordisLocked(string clientId, string userName)
         {
-            
             DataTable dataTable = new DataTable();
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
@@ -117,45 +116,51 @@ namespace Wpf_exp1
                     //throw new InvalidOperationException("編集中のためロック取得失敗");
                     return true; // ロックされている場合はtrueを返す
                 }
-                // パラメーターを作成
-                SqlParameter[] updateParams = new SqlParameter[]
-                {
-                      new SqlParameter("@ClientId", clientId),
-                      new SqlParameter("@user", userName)
-                };
-                // todo: FIXME IsEditing フラグテーブルと EditingBy ユーザー名のカラムを作成する必要がある
-      
-                // 編集フラグ更新
-                using (cmd = new SqlCommand(
-                "UPDATE baseData SET IsEditing = 1, EditingBy = @user WHERE client_id = @id",
-                connection))　// HACK: FIXME:  なのでこのSQL文を現在実行するとエラーが発生する。
-                {
-                    // 必ず SqlCommand へパラメーターを登録すること
-                    cmd.Parameters.Add("@user", SqlDbType.NVarChar, 100).Value = userName;
-                    cmd.Parameters.Add("@id", SqlDbType.Int).Value = clientId;
-
-                    int rows = cmd.ExecuteNonQuery();
-                    // rows が 1 以上なら成功
-                    if (rows > 0)
-                    {
-                        //// ロックが成功した場合、データを取得して返す
-                        //cmd.CommandText = "SELECT * FROM baseData WHERE client_id = @id";
-                        //using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-                        //{
-                        //    adapter.Fill(dataTable);
-                        //}
-                        //return true; // ロック成功
-                    }
-                    else
-                    {
-                        // 編集フラグの更新に失敗した場合はロックを解放
-                        //cmd.CommandText = "EXEC sp_releaseapplock @Resource, 'Session'";
-                        //cmd.ExecuteNonQuery();
-                    }
-                }
-
             }
             return false; // ロックされていない場合はfalseを返す
+        }
+        public bool SetClientRecordLock(string clientId, string userName)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    //DECLARE @rv INT;
+                    cmd.CommandText = @"
+                        EXEC @rv = sp_getapplock
+                        @Resource = @res,
+                        @LockMode = 'Exclusive',
+                        @LockOwner = 'Session',
+                        @LockTimeout = 0;
+
+                        IF @rv < 0
+                        THROW 51000, 'ロック取得失敗', 1;
+
+                        -- 編集フラグを立てる
+                        UPDATE baseData
+                        SET IsEditing = 1, EditingBy = @UserName
+                        WHERE client_id = @ClientId;
+
+                        SELECT @rv;
+";
+                    // パラメータをすべて正しく追加
+                    cmd.Parameters.AddWithValue("@res", "baseData:" + clientId);
+                    cmd.Parameters.AddWithValue("@UserName", userName);
+                    cmd.Parameters.AddWithValue("@ClientId", clientId);
+
+                    // 戻り値取得用
+                    var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
+                    rvParam.Direction = ParameterDirection.Output;
+
+                    // 実行
+                    cmd.ExecuteNonQuery();
+
+                    int rv = (int)rvParam.Value;
+                    return rv >= 0;
+                }
+            }
         }
         /// <summary>
         /// ロック解放処理を行うメソッドです。
@@ -164,24 +169,42 @@ namespace Wpf_exp1
         /// <returns></returns>
         public bool ReleaseClientRecordLock(string clientId)
         {
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+            DECLARE @rv INT;
+
+            SELECT @rv = APPLOCK_TEST('public', @res, 'Exclusive', 'Session');
+
+            IF @rv = 0
+            BEGIN
+                EXEC sp_releaseapplock 
+                    @Resource    = @res,
+                    @LockOwner   = 'Session',
+                    @DbPrincipal= 'public';
+            END
+
+            UPDATE baseData
+            SET IsEditing = 0, EditingBy = NULL
+            WHERE client_id = @ClientId;
+";
+            cmd.Parameters.AddWithValue("@res", "baseData:" + clientId);
+            cmd.Parameters.AddWithValue("@ClientId", clientId);
+
+            try
             {
-                // パラメーターを作成
-                SqlParameter[] updateParams = new SqlParameter[]
-                {
-                      new SqlParameter("@ClientId", clientId),
-                };
-                connection.Open();
-                // 編集フラグ解除
-                new SqlCommand("UPDATE baseData SET IsEditing = 0, EditingBy = NULL WHERE client_id = @id", connection)
-                    .ExecuteNonQuery();
-                // ロック解放
-                var cmd = new SqlCommand("EXEC sp_releaseapplock @Resource, 'Session'", connection);
-                cmd.Parameters.AddWithValue("@Resource", "baseData:" + clientId);
                 cmd.ExecuteNonQuery();
+                return true;
             }
-            return true; // ロック解除成功
+            catch (SqlException ex)
+            {
+                Console.Error.WriteLine($"[{ex.Number}] {ex.Message}");
+                return false;
+            }
         }
+
         /// sqlServerへのデータ新規登録処理
         /// </summary>
         public bool InsertClientData(string name, string age, string Address)

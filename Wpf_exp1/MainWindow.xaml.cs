@@ -55,7 +55,7 @@ namespace Wpf_exp1
             this.InitializeTextBoxes(); // テキストボックスの初期化
 
             ///UIにてファイルの内容を表示
-            DisplayData();
+            DisplayDebug();// デバッグ用の表示メソッドを呼び出す
             this.ClientDataGrid.SelectionMode = DataGridSelectionMode.Single; // 単一選択モードに設定
         }
         /// <summary>
@@ -80,7 +80,7 @@ namespace Wpf_exp1
         /// <summary>
         /// データの画面表示
         /// </summary>
-        private void DisplayData() {
+        private void DisplayDebug() {
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
 
             // GetData メソッドを呼び出し、結果を取得
@@ -103,6 +103,60 @@ namespace Wpf_exp1
                         case "client_id":
                             column.Caption = "ID";
                             break;
+
+                        // 他の列についても同様に設定
+                        default:
+                            break;
+                    }
+                    var newColumn = new DataGridTextColumn();
+                    newColumn.Binding = new Binding(column.ColumnName); // データのバインド
+                    newColumn.Header = column.Caption; // ここでCaptionを設定
+
+                    // DataGridに列を追加
+                    ClientDataGrid.Columns.Add(newColumn);
+                }
+                // UI 要素の操作
+                ClientDataGrid.ItemsSource = data.DefaultView;
+            });
+
+        }
+        /// <summary>
+        /// データの画面表示
+        /// </summary>
+        private void DisplayData()
+        {
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+
+            // GetData メソッドを呼び出し、結果を取得
+            DataTable data = dataAccess.GetClientsData();
+            Dispatcher.Invoke(() =>
+            {
+                foreach (DataColumn column in data.Columns)
+                {
+                    switch (column.ColumnName)
+                    {
+                        case "client_name":
+                            column.Caption = "氏名";
+                            break;
+                        case "client_age":
+                            column.Caption = "年齢";
+                            break;
+                        case "client_address":
+                            column.Caption = "住所";
+                            break;
+                        case "client_id":
+                            column.Caption = "ID";
+                            break;
+                        case "IsEditing":
+                            column.Caption = "編集中";
+                            continue; // "IsEditing" 列は表示しない
+                        case "EditingBy":
+                            column.Caption = "ユーザー名";
+                            continue; // "EditingBy" 列は表示しない
+
+                        case "StartedAt":
+                            column.Caption = "時間";
+                            continue; // "StartedAt" 列は表示しない
 
                         // 他の列についても同様に設定
                         default:
@@ -176,7 +230,7 @@ namespace Wpf_exp1
             {
                 ///UIにてファイルの内容を表示
                 ClientDataGrid.Columns.Clear(); 
-                DisplayData();
+                DisplayDebug();
                 //textboxコンストラクタ
                 this.txtbox_Name.Text = "";
                 this.txtbox_Age.Text = "";
@@ -196,7 +250,6 @@ namespace Wpf_exp1
         /// </summary>
         private void DeleteClientData()
         {
-
             // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
 
@@ -219,7 +272,7 @@ namespace Wpf_exp1
                 Console.WriteLine($"{affectedRows} 行が削除されました。");
                 // UI にてデータを再表示
                 ClientDataGrid.Columns.Clear();
-                DisplayData();
+                DisplayDebug();
 
                 // テキストボックスをクリア
                 this.txtbox_Name.Text = "";
@@ -252,9 +305,6 @@ namespace Wpf_exp1
                 this.txtbox_Address.Text.Trim()
                 ,this.currentId))
             {
-                // UI にてファイルの内容を表示
-                ClientDataGrid.Columns.Clear();
-                DisplayData();
 
                 // テキストボックスをクリア
                 this.txtbox_Name.Text = "";
@@ -276,6 +326,10 @@ namespace Wpf_exp1
                 Console.WriteLine("データの更新に失敗しました。");
             }
             dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+            //UIの更新                                                                          
+            ClientDataGrid.Columns.Clear();
+            DisplayDebug();
+
 
         }
 
@@ -380,13 +434,30 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
-               SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-               if(dataAccess.CheckIfClientRecordisLocked(this.currentId.ToString(),this.userName)) 
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+
+            //// GetData メソッドを呼び出し、結果を取得
+            //DataTable data = dataAccess.GetClientsData();
+            //var match = data.AsEnumerable().FirstOrDefault(r => r.Field<int>("client_id") == 14);
+            //if (match != null)
+            //{
+            //    string name = match.Field<string>("editingby");
+            //}
+
+            /// 編集モードに入る前に、現在のレコードが他のユーザーによってロックされているか確認
+            if (dataAccess.CheckIfClientRecordisLocked(this.currentId.ToString(),this.userName)) 
                {
                    MessageBox.Show("他ユーザーが編集中です", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                    return;
                }
-               this.editMode = 1; // 編集モードに設定
+            // 編集モードに入る前に、現在のレコードをロックする
+            if (!dataAccess.SetClientRecordLock(this.currentId.ToString(), this.userName))
+            {
+                    MessageBox.Show("データのロックに失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+            }
+            // 編集モードの設定
+            this.editMode = 1; // 編集モードに設定
                this.txtbox_Name.IsEnabled = true; // 名前のテキストボックスを有効化
                this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックスを有効化
                this.txtbox_Address.IsEnabled = true; // 住所のテキストボックスを有効化
