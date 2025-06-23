@@ -10,22 +10,27 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="208*"/>
-            <ColumnDefinition Width="459*"/>
+            <ColumnDefinition Width="65*"/>
+            <ColumnDefinition Width="45*"/>
+            <ColumnDefinition Width="349*"/>
             <ColumnDefinition Width="133*"/>
         </Grid.ColumnDefinitions>
-        <TextBox HorizontalAlignment="Left" Height="5" Margin="214,238,0,0" TextWrapping="Wrap" Text="TextBox_Name" VerticalAlignment="Top" Width="4" Grid.Column="1"/>
-        <TextBox x:Name="txtbox_Name" HorizontalAlignment="Left" Margin="137,64,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="2"/>
+        <Canvas Grid.ColumnSpan="3" Margin="106,253,0,0" Height="138" VerticalAlignment="Top" HorizontalAlignment="Left" Width="212"/>
+        <TextBox HorizontalAlignment="Left" Height="5" Margin="104,238,0,0" TextWrapping="Wrap" Text="TextBox_Name" VerticalAlignment="Top" Width="4" Grid.Column="3"/>
+        <TextBox x:Name="txtbox_Name" HorizontalAlignment="Left" Margin="137,64,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="3"/>
         <Label x:Name="label_Name" Content="お名前" HorizontalAlignment="Left" Margin="64,60,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.107,-0.884"/>
-        <Button x:Name="btnRegistration" Content="登録" Margin="170,341,3,0" VerticalAlignment="Top" Click="btnRegistration_Click" RenderTransformOrigin="1.379,0.952" Width="35"/>
-        <TextBox x:Name="txtbox_Age" HorizontalAlignment="Left" Margin="137,109,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="2"/>
+        <Canvas Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="58" Margin="143,302,0,0" VerticalAlignment="Top" Width="137">
+            <Button x:Name="btnRegistration" Content="登録" Click="btnRegistration_Click" RenderTransformOrigin="1.379,0.952" Width="35" Height="20" HorizontalAlignment="Left" Canvas.Left="27" Canvas.Top="38" VerticalAlignment="Top"/>
+            <Button x:Name="btnNewData" Content="新規" Click="btnNewData_Click" Height="20" Width="35" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+            <Button x:Name="btnDelete" Content="削除" Click="btnDelete_Click" RenderTransformOrigin="1.349,0.605" Height="20" Width="34" HorizontalAlignment="Left" Canvas.Left="103" VerticalAlignment="Top"/>
+            <Button x:Name="btnCancel" Content="取消" RenderTransformOrigin="0.703,-0.986" Click="btnCancel_Click" Height="20" Width="35" HorizontalAlignment="Left" Canvas.Left="75" Canvas.Top="38" VerticalAlignment="Top"/>
+        </Canvas>
+        <TextBox x:Name="txtbox_Age" HorizontalAlignment="Left" Margin="137,109,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="3"/>
         <Label x:Name="label_Nameコピー__C_" Content="年齢" HorizontalAlignment="Left" Margin="64,105,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.107,-0.884" Width="55"/>
-        <TextBox x:Name="txtbox_Address" HorizontalAlignment="Left" Margin="137,158,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="2"/>
+        <TextBox x:Name="txtbox_Address" HorizontalAlignment="Left" Margin="137,158,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="156" TextChanged="TextBox_TextChanged" RenderTransformOrigin="0.5,-0.592" Grid.ColumnSpan="3"/>
         <Label x:Name="label_Nameコピー__C_コピー__C_" Content="住所" HorizontalAlignment="Left" Margin="64,154,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.107,-0.884" Width="55"/>
-        <DataGrid x:Name="ClientDataGrid" Grid.Column="1" d:ItemsSource="{d:SampleData ItemCount=5}" Grid.ColumnSpan="2" Margin="123,10,10,13" SelectedCellsChanged="ClientDataGrid_SelectedCellsChanged" EnableRowVirtualization="False" IsReadOnly="True" AutoGenerateColumns="False"/>
-        <Button x:Name="btnEdit" Content="編集" HorizontalAlignment="Left" Margin="194,302,0,0" VerticalAlignment="Top" RenderTransformOrigin="1.069,0.652" Grid.ColumnSpan="2" Click="btnEdit_Click" Width="35"/>
-        <Button x:Name="btnNewData" Content="新規" Margin="143,302,30,0" VerticalAlignment="Top" Click="btnNewData_Click"/>
-        <Button x:Name="btnDelete" Content="削除" HorizontalAlignment="Left" Margin="38,302,0,0" VerticalAlignment="Top" Click="btnDelete_Click" RenderTransformOrigin="1.349,0.605" Grid.Column="1" Width="35"/>
-        <Button x:Name="btnCancel" Content="取消" HorizontalAlignment="Left" Margin="10,341,0,0" VerticalAlignment="Top" Width="35" RenderTransformOrigin="0.703,-0.986" Grid.Column="1" Click="btnCancel_Click"/>
+        <DataGrid x:Name="ClientDataGrid" Grid.Column="3" d:ItemsSource="{d:SampleData ItemCount=5}" Grid.ColumnSpan="2" Margin="13,10,10,13" SelectedCellsChanged="ClientDataGrid_SelectedCellsChanged" EnableRowVirtualization="False" IsReadOnly="True" AutoGenerateColumns="False"/>
+        <Button x:Name="btnEdit" Content="編集" HorizontalAlignment="Left" Margin="194,302,0,0" VerticalAlignment="Top" RenderTransformOrigin="1.069,0.652" Grid.ColumnSpan="2" Click="btnEdit_Click" Width="35" Height="20"/>
     </Grid>
 
 

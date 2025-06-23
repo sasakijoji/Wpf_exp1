@@ -39,7 +39,7 @@ namespace Wpf_exp1
         private const int EDIT_MODE = 1; // 編集モード
         private int editMode = NEW_MODE; // 編集モードのフラグ（0: 新規登録, 1: 編集）
       　//カレントIDを保持する変数
-        private int currentId = 0; // 現在のIDを保持する変数
+        private int currentId = 0; // 現在の行データのIDを保持する変数
         private bool beginEdit = false; // 編集開始フラグ
         private string userName;
 
@@ -214,7 +214,8 @@ namespace Wpf_exp1
             {
                 InsertClientData(); // 新規登録処理を呼び出す
             }
-            else {
+            else 
+            {
                 EditClientData(); // 編集処理を呼び出す  
             }
         }
@@ -235,15 +236,49 @@ namespace Wpf_exp1
                 this.txtbox_Name.Text = "";
                 this.txtbox_Age.Text = "";
                 this.txtbox_Address.Text = "";
+                this.txtbox_Name.IsEnabled = true; // 名前のテキストボックス
+                this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックス
+                this.txtbox_Address.IsEnabled = true; // 住所のテキストボックス
+                this.ClientDataGrid.IsEnabled = true; // DataGridの有効化
                 MessageBox.Show("データの登録が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
                 this.btnDelete.IsEnabled = true;
                 this.btnEdit.IsEnabled = true;
                 this.btnNewData.IsEnabled = true;
+                this.btnRegistration.IsEnabled = false; // 登録ボタンの無効か
+                this.btnCancel.IsEnabled = false; // 編集ボタンの無効か
             }
             else
             {
                 MessageBox.Show("データの登録に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// レコードをロックするメソッド
+        /// </summary>
+        private bool LockClientRecord()
+        {
+            // SqlServerDataAccess クラスのインスタンスを生成
+            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            if (this.currentId == 0) // 現在のIDが0の場合は何もロックしない
+            {
+                MessageBox.Show("データが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            if (!dataAccess.SetClientRecordLock(this.currentId.ToString(), this.userName))
+            {
+                // GetData メソッドを呼び出し、結果を取得
+                DataTable data = dataAccess.GetClientsData();
+                var match = data.AsEnumerable().FirstOrDefault(r => r.Field<int>("client_id") == this.currentId);
+                string byUser = ""; // 編集を試みたユーザー名
+                if (match != null)
+                {
+                    byUser = match.Field<string>("editingby");
+                }
+                MessageBox.Show("データのロックに失敗しました。編集者は:" + byUser + "です。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            return true; // ロック成功
         }
         /// <summary>
         /// 削除ボタンクリックイベント
@@ -252,7 +287,10 @@ namespace Wpf_exp1
         {
             // SqlServerDataAccess クラスのインスタンスを生成
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-
+            if(false == this.LockClientRecord()) // レコードをロックできなかった場合は削除しない
+            {
+                return; // ロックに失敗した場合は処理を中断
+            }
             // 削除する SQL コマンドを定義
             string deleteQuery = "DELETE FROM baseData WHERE client_name = @Name AND client_age = @Age AND client_address = @Address";
 
@@ -305,11 +343,13 @@ namespace Wpf_exp1
                 this.txtbox_Address.Text.Trim()
                 ,this.currentId))
             {
-
                 // テキストボックスをクリア
-                this.txtbox_Name.Text = "";
-                this.txtbox_Age.Text = "";
-                this.txtbox_Address.Text = "";
+                //this.txtbox_Name.Text = "";
+                //this.txtbox_Age.Text = "";
+                //this.txtbox_Address.Text = "";
+                this.txtbox_Name.IsEnabled = false; // 名前のテキストボックスを無効化
+                this.txtbox_Age.IsEnabled = false; // 年齢のテキストボックスを無効化
+                this.txtbox_Address.IsEnabled = false; // 住所のテキストボックスを無効化
 
                 MessageBox.Show("データの更新が完了しました。", "通知", MessageBoxButton.OK, MessageBoxImage.Information);
                 // ボタンの有効化
@@ -326,10 +366,17 @@ namespace Wpf_exp1
                 Console.WriteLine("データの更新に失敗しました。");
             }
             dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+  
+            int rowIndex = ClientDataGrid.Items.IndexOf(ClientDataGrid.SelectedItem); // 選択された行のインデックスを取得  
             //UIの更新                                                                          
             ClientDataGrid.Columns.Clear();
             DisplayDebug();
-
+            //カレントRowを選択状態にする
+            if (0 <= rowIndex && rowIndex < ClientDataGrid.Items.Count)
+            {
+                ClientDataGrid.SelectedIndex = rowIndex;
+                ClientDataGrid.ScrollIntoView(ClientDataGrid.Items[rowIndex]);
+            }
 
         }
 
@@ -358,7 +405,7 @@ namespace Wpf_exp1
             }
         }
         /// <summary>
-        /// 
+        /// データの選択状態が変わった際に発生するイベント
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -421,11 +468,24 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
+            if (this.beginEdit) 
+            {
+                SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+                dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+            }
                 this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
                 this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化
                 this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
                 this.ClientDataGrid.IsEnabled = true; // DataGridの無効化
                 this.InitializeTextBoxes(); // テキストボックスの初期化
+                int rowIndex = ClientDataGrid.Items.IndexOf(ClientDataGrid.SelectedItem); // 選択された行のインデックスを取得  
+                //UIの更新                                                                          
+                if (0 <= rowIndex && rowIndex < ClientDataGrid.Items.Count)
+                {
+                    ClientDataGrid.SelectedIndex = rowIndex;
+                    ClientDataGrid.ScrollIntoView(ClientDataGrid.Items[rowIndex]);
+                }
+
         }
         /// <summary>
         /// 編集ボタンのクリックイベント  
@@ -435,41 +495,22 @@ namespace Wpf_exp1
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-
-            //// GetData メソッドを呼び出し、結果を取得
-            //DataTable data = dataAccess.GetClientsData();
-            //var match = data.AsEnumerable().FirstOrDefault(r => r.Field<int>("client_id") == 14);
-            //if (match != null)
-            //{
-            //    string name = match.Field<string>("editingby");
-            //}
-
-            /// 編集モードに入る前に、現在のレコードが他のユーザーによってロックされているか確認
-            if (dataAccess.CheckIfClientRecordisLocked(this.currentId.ToString(),this.userName)) 
-               {
-                   MessageBox.Show("他ユーザーが編集中です", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
-                   return;
-               }
             // 編集モードに入る前に、現在のレコードをロックする
-            if (!dataAccess.SetClientRecordLock(this.currentId.ToString(), this.userName))
+            if (false == this.LockClientRecord()) // レコードをロックできなかった場合は削除しない
             {
-                    MessageBox.Show("データのロックに失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
+                return; // ロックに失敗した場合は処理を中断
             }
-            // 編集モードの設定
-            this.editMode = 1; // 編集モードに設定
-               this.txtbox_Name.IsEnabled = true; // 名前のテキストボックスを有効化
-               this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックスを有効化
-               this.txtbox_Address.IsEnabled = true; // 住所のテキストボックスを有効化
-               this.ClientDataGrid.IsEnabled = false; // DataGridの無効化
-               this.btnCancel.IsEnabled = true; // キャンセルボタンの有効化
-               this.btnRegistration.IsEnabled = true; // 登録ボタンの有効化
-               this.btnNewData.IsEnabled = false; // 新規データ登録ボタンの無効化
-               this.btnEdit.IsEnabled = false; // 編集ボタンの無効化
-               this.btnDelete.IsEnabled = false; // 削除ボタンの無効化
-
-               this.beginEdit = true; // 編集開始フラグを立てる
-
+            this.editMode =  MainWindow.EDIT_MODE; // 編集モードに設定
+            this.beginEdit = true; // 編集開始フラグを立てる
+            this.txtbox_Name.IsEnabled = true; // 名前のテキストボックスを有効化
+            this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックスを有効化
+            this.txtbox_Address.IsEnabled = true; // 住所のテキストボックスを有効化
+            this.ClientDataGrid.IsEnabled = false; // DataGridの無効化
+            this.btnCancel.IsEnabled = true; // キャンセルボタンの有効化
+            this.btnRegistration.IsEnabled = true; // 登録ボタンの有効化
+            this.btnNewData.IsEnabled = false; // 新規データ登録ボタンの無効化
+            this.btnEdit.IsEnabled = false; // 編集ボタンの無効化
+            this.btnDelete.IsEnabled = false; // 削除ボタンの無効化
         }
     }
 }

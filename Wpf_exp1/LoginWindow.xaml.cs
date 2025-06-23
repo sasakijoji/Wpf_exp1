@@ -28,10 +28,20 @@ namespace Wpf_exp1
         public LoginWindow()
         {
             InitializeComponent();
+            this.txtbox_PassWord.Visibility = Visibility.Collapsed; // パスワードを非表示
 
             // ユーザーをデータベースに挿入
             //SqlServerDataAccess dataAccess = new SqlServerDataAccess();
             //dataAccess.InsertUser("user2", "ilverde00");
+
+#if DEBUG
+            //            if (true) // デバッグ用のフラグを追加
+            //デバッグ用コード
+            //MainWindow mainWindow = new MainWindow(this.UserName);
+            //mainWindow.Show();
+            //this.Close()
+
+#endif
         }
         /// <summary>
         /// ログインボタンをクリックしたときの処理
@@ -40,8 +50,17 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btn_Login_Click(object sender, RoutedEventArgs e)
         {
+            //チェックボックスにより判断
+            if (chkBox_ShowPassword.IsChecked == true)
+            {
+                this.Password = txtbox_PassWord.Text;
+            }
+            else 
+            {
+                this.Password = pssBox.Password;
+            }
+
             this.UserName = this.txtbox_UserName.Text.Trim(); // ユーザー名を取得
-            this.Password = this.txtbox_PassWord.Text.Trim(); // パスワードを取得
             SqlServerDataAccess dataAccess = new SqlServerDataAccess();
             DataTable = dataAccess.GetUserID(this.UserName, this.Password);
             if (DataTable.Rows.Count <= 0)
@@ -62,6 +81,33 @@ namespace Wpf_exp1
         private void btn_quit_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+        }
+        /// <summary>
+        /// チェックボックスをチェックしたときの処理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void chkBox_ShowPassword_Checked(object sender, RoutedEventArgs e)
+
+        {
+            this.pssBox.Visibility = Visibility.Collapsed; // パスワードボックスを非表示
+            this.Password = this.pssBox.Password; // パスワードを取得
+            this.txtbox_PassWord.Visibility = Visibility.Visible; // パスワードを表示
+            this.txtbox_PassWord.Text = this.Password; // パスワードをテキストボックスに設定
+        }
+        /// <summary>
+        /// checkboxをチェックを外したときの処理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void chkBox_ShowPassword_Unchecked(object sender, RoutedEventArgs e)
+        {
+            this.txtbox_PassWord.Visibility = Visibility.Collapsed; // パスワードを非表示
+            this.pssBox.Visibility = Visibility.Visible; // パスワードボックスを表示
+            this.pssBox.Focus(); // パスワードボックスにフォーカスを移動
+            this.Password = this.txtbox_PassWord.Text.Trim(); // テキストボックスからパスワードを取得
+            this.pssBox.Password = this.Password; // パスワードを再設定
+
         }
     }
 }

@@ -17,23 +17,6 @@ using System.Xml.Linq;
 
 namespace Wpf_exp1
 {
-    public class PasswordUtility
-    {
-        // パスワードとソルトを使ってハッシュ化するメソッド
-        public static byte[] HashPassword(string password, Guid salt)
-        {
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt.ToByteArray(), 10000, HashAlgorithmName.SHA256))
-            {
-                return pbkdf2.GetBytes(32);  // 256ビットのハッシュ
-            }
-        }
-
-        // ソルトを生成するメソッド
-        public static Guid GenerateSalt()
-        {
-            return Guid.NewGuid();
-        }
-    }
     /// <summary>
     /// サーバーへのデータアクセスを提供するクラスです。
     /// </summary>
@@ -54,114 +37,178 @@ namespace Wpf_exp1
         /// <returns></returns>
         public DataTable GetClientsData()
         {
-            DataTable dataTable = new DataTable();
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            var dataTable = new DataTable();
+
+            try
             {
+                using var connection = new SqlConnection(_connectionString);
                 connection.Open();
-                string query = "SELECT * FROM baseData";
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(command))
-                    {
-                        adapter.Fill(dataTable);
-                    }
-                }
+
+                using var command = new SqlCommand("SELECT * FROM baseData", connection);
+                using var adapter = new SqlDataAdapter(command);
+
+                adapter.Fill(dataTable);
             }
-            return dataTable;
-        }
-        public DataTable LockClientRecordById(string clientId)
-        {
-            DataTable dataTable = new DataTable();
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            catch (SqlException sqlEx)
             {
-                connection.Open();
-                string query = "SELECT * FROM baseData WITH (UPDLOCK, ROWLOCK) WHERE client_id=@ClientId";
-                // パラメーターを作成
-                SqlParameter[] updateParams = new SqlParameter[]
-                {
-                            new SqlParameter("@ClientId", clientId)
-                };
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(command))
-                    {
-                        adapter.Fill(dataTable);
-                    }
-                }
+                // DB接続・クエリ実行時のエラー処理
+                Console.Error.WriteLine($"SQLエラー (GetClientsData): {sqlEx.Message}");
+                // 必要に応じて独自例外や再スローも可能
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // その他のエラー全般（例えばDataTable生成や環境異常など）
+                Console.Error.WriteLine($"予期せぬエラー (GetClientsData): {ex.Message}");
+                throw;
             }
             return dataTable;
         }
         /// <summary>
-        /// ロックを取得し、クライアントのレコードが編集中かどうかを確認し、
-        /// かかってなければロックフラグを立てる
+        /// クライアントのレコードをIDでロックします。
+        /// </summary>
+        /// <param name="clientId"></param>
+        /// <returns></returns>
+        public DataTable LockClientRecordById(string clientId)
+        {
+            var dataTable = new DataTable();
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                connection.Open();
+
+                const string query =
+                    "SELECT * FROM baseData WITH (UPDLOCK, ROWLOCK) WHERE client_id = @ClientId";
+
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@ClientId", clientId);
+
+                using var adapter = new SqlDataAdapter(command);
+                adapter.Fill(dataTable);
+            }
+            catch (SqlException sqlEx)
+            {
+                Console.Error.WriteLine($"[SQLエラー] LockClientRecordById: {sqlEx.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[予期せぬエラー] LockClientRecordById: {ex.Message}");
+                throw;
+            }
+
+            return dataTable;
+        }
+
+        /// <summary>
+        /// ロック取得を試み、既にロックされていれば true を返し、そうでなければロックを確保して false を返します。
+        /// </summary>
+        public bool CheckIfClientRecordIsLocked(string clientId, string userName)
+        {
+            const string sql = @"
+            DECLARE @rv INT;
+            EXEC @rv = sp_getapplock
+                @Resource = @Resource,
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Session',
+                @LockTimeout = 0;
+            SELECT @rv;
+             ";
+
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.Add(new SqlParameter("@Resource", SqlDbType.NVarChar, 256)
+                {
+                    Value = "baseData:" + clientId
+                });
+
+                var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
+                rvParam.Direction = ParameterDirection.ReturnValue;
+
+                cmd.ExecuteNonQuery();
+
+                int rv = (int)rvParam.Value;
+                return rv < 0;  // true = ロックされている or 取得失敗
+            }
+            catch (SqlException sqlEx)
+            {
+                Console.Error.WriteLine($"[SQLエラー] CheckIfClientRecordIsLocked: Code={sqlEx.Number}, Msg={sqlEx.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[予期せぬエラー] CheckIfClientRecordIsLocked: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 
         /// </summary>
         /// <param name="clientId"></param>
         /// <param name="userName"></param>
         /// <returns></returns>
-        public bool CheckIfClientRecordisLocked(string clientId, string userName)
-        {
-            DataTable dataTable = new DataTable();
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                // セッション所有のロックを取得（タイムアウト0で即時取得or失敗）
-                var cmd = new SqlCommand("DECLARE @rv INT;EXEC @rv = sp_getapplock @Resource, 'Exclusive', 'Session', 0", connection);
-                cmd.Parameters.AddWithValue("@Resource", "baseData:" + clientId);
-                var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
-                rvParam.Direction = ParameterDirection.ReturnValue;
-                cmd.ExecuteNonQuery();
-                int rv = (int)rvParam.Value;
-                if (rv < 0)
-                {
-                    //throw new InvalidOperationException("編集中のためロック取得失敗");
-                    return true; // ロックされている場合はtrueを返す
-                }
-            }
-            return false; // ロックされていない場合はfalseを返す
-        }
         public bool SetClientRecordLock(string clientId, string userName)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            try
             {
+                using var conn = new SqlConnection(_connectionString);
                 conn.Open();
 
-                using (var cmd = conn.CreateCommand())
-                {
-                    //DECLARE @rv INT;
-                    cmd.CommandText = @"
-                        EXEC @rv = sp_getapplock
-                        @Resource = @res,
-                        @LockMode = 'Exclusive',
-                        @LockOwner = 'Session',
-                        @LockTimeout = 0;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                EXEC @rv = sp_getapplock
+                    @Resource = @res,
+                    @LockMode = 'Exclusive',
+                    @LockOwner = 'Session',
+                    @LockTimeout = 0;
 
-                        IF @rv < 0
-                        THROW 51000, 'ロック取得失敗', 1;
+                IF @rv < 0
+                    THROW 51000, 'ロック取得失敗', 1;
 
-                        -- 編集フラグを立てる
-                        UPDATE baseData
-                        SET IsEditing = 1, EditingBy = @UserName
-                        WHERE client_id = @ClientId;
+                UPDATE baseData
+                SET IsEditing = 1, EditingBy = @UserName
+                WHERE client_id = @ClientId;
 
-                        SELECT @rv;
-";
-                    // パラメータをすべて正しく追加
-                    cmd.Parameters.AddWithValue("@res", "baseData:" + clientId);
-                    cmd.Parameters.AddWithValue("@UserName", userName);
-                    cmd.Parameters.AddWithValue("@ClientId", clientId);
+                SELECT @rv;
+                 ";
 
-                    // 戻り値取得用
-                    var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
-                    rvParam.Direction = ParameterDirection.Output;
+                cmd.Parameters.AddWithValue("@res", "baseData:" + clientId);
+                cmd.Parameters.AddWithValue("@UserName", userName);
+                cmd.Parameters.AddWithValue("@ClientId", clientId);
 
-                    // 実行
-                    cmd.ExecuteNonQuery();
+                var rvParam = cmd.Parameters.Add("@rv", SqlDbType.Int);
+                rvParam.Direction = ParameterDirection.Output;
 
-                    int rv = (int)rvParam.Value;
-                    return rv >= 0;
-                }
+                cmd.ExecuteNonQuery();
+
+                return (int)rvParam.Value >= 0;
+            }
+            catch (SqlException sqlEx)
+            {
+                Console.Error.WriteLine($"[SQLエラー] SetClientRecordLock: Code={sqlEx.Number}, Message={sqlEx.Message}");
+                return false; 
+                throw;  // スタックトレースを保持して再スロー
+                
+            }
+            catch (InvalidOperationException invOpEx)
+            {
+                Console.Error.WriteLine($"[状態エラー] SetClientRecordLock: {invOpEx.Message}");
+                return false;
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[予期せぬエラー] SetClientRecordLock: {ex.Message}");
+                return false;
+                throw;
             }
         }
+
         /// <summary>
         /// ロック解放処理を行うメソッドです。
         /// </summary>
@@ -289,6 +336,88 @@ namespace Wpf_exp1
             }
         }
 
+
+        /// <summary>
+        /// データベースにデータを書き込みます（INSERT, UPDATE, DELETEなどのSQLコマンドを実行）。
+        /// </summary>
+        /// <param name="commandText">実行するSQLコマンド文字列。</param>
+        /// <param name="parameters">SQLコマンドに渡すパラメーターの配列。</param>
+        /// <returns>影響を受けた行数。</returns>
+        public int SetData(string commandText, params SqlParameter[] parameters)
+        {
+            int rowsAffected = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    connection.Open();
+                    using (SqlCommand command = new SqlCommand(commandText, connection))
+                    {
+                        // パラメータを追加
+                        if (parameters != null)
+                        {
+                            command.Parameters.AddRange(parameters);
+                        }
+                        // SQLコマンドを実行し、影響を受けた行数を取得
+                        rowsAffected = command.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (SqlException ex)
+            {
+                // SQL関連のエラー処理
+                //LogError(ex);
+                throw new ApplicationException("データベース操作中にエラーが発生しました。", ex);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // 接続状態やコマンドの状態に関連するエラー処理
+                //LogError(ex);
+                throw new ApplicationException("データベース接続の状態に問題があります。", ex);
+            }
+            catch (Exception ex)
+            {
+                // その他の一般的なエラー処理
+                //LogError(ex);
+                throw new ApplicationException("予期しないエラーが発生しました。", ex);
+            }
+            return rowsAffected;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <param name="connection"></param>
+        /// <param name="transaction"></param>
+        /// <returns></returns>
+        private int SetData(string query, SqlParameter[] parameters, SqlConnection connection, SqlTransaction transaction)
+        {
+            try
+            {
+                using var command = new SqlCommand(query, connection, transaction);
+                command.Parameters.AddRange(parameters);
+                return command.ExecuteNonQuery();
+            }
+            catch (SqlException sqlEx)
+            {
+                // SQL エラー（例：制約違反、接続切れなど）
+                Console.Error.WriteLine($"[SQLエラー] SetData: {sqlEx.Number} – {sqlEx.Message}");
+                throw; // 必要に応じて再スロー
+            }
+            catch (InvalidOperationException invOpEx)
+            {
+                // 接続状態不正など、ADO.NET の状態異常エラー
+                Console.Error.WriteLine($"[状態エラー] SetData: {invOpEx.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // その他の予期しない例外
+                Console.Error.WriteLine($"[予期せぬエラー] SetData: {ex.Message}");
+                throw;
+            }
+        }
         /// <summary>
         /// ユーザーをデータベースに挿入します。
         /// </summary>
@@ -296,37 +425,51 @@ namespace Wpf_exp1
         /// <param name="password"></param>
         public void InsertUser(string userName, string password)
         {
-            // ソルトを生成
-            Guid salt = PasswordUtility.GenerateSalt();
-
-            // パスワードをハッシュ化
-            byte[] passwordHash = PasswordUtility.HashPassword(password, salt);
-
-            // 現在の日付と時刻を設定
-            DateTime createdAt = DateTime.Now;
-
-            // SQLクエリを構築
-            string query = @"
-            INSERT INTO [dbo].[Users] ([UserName], [PasswordHash], [CreatedAt], [Salt])
-            VALUES (@UserName, @PasswordHash, @CreatedAt, @Salt) ";
-
-            // SQL接続とコマンドを設定
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    // パラメータの設定
-                    command.Parameters.AddWithValue("@UserName", userName);
-                    command.Parameters.AddWithValue("@PasswordHash", passwordHash);  // ハッシュ化されたパスワードを設定
-                    command.Parameters.AddWithValue("@CreatedAt", createdAt);
-                    command.Parameters.AddWithValue("@Salt", salt);  // ソルトを設定
+                // ソルトを生成
+                Guid salt = PasswordUtility.GenerateSalt();
 
-                    // SQL接続を開いて実行
-                    connection.Open();
-                    command.ExecuteNonQuery();
+                // パスワードをハッシュ化
+                byte[] passwordHash = PasswordUtility.HashPassword(password, salt);
+
+                // 現在の日付と時刻を設定
+                DateTime createdAt = DateTime.Now;
+
+                // SQLクエリを構築
+                string query = @"
+                INSERT INTO [dbo].[Users] ([UserName], [PasswordHash], [CreatedAt], [Salt])
+                VALUES (@UserName, @PasswordHash, @CreatedAt, @Salt) ";
+
+                // SQL接続とコマンドを設定
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        // パラメータの設定
+                        command.Parameters.AddWithValue("@UserName", userName);
+                        command.Parameters.AddWithValue("@PasswordHash", passwordHash);
+                        command.Parameters.AddWithValue("@CreatedAt", createdAt);
+                        command.Parameters.AddWithValue("@Salt", salt);
+
+                        // SQL接続を開いて実行
+                        connection.Open();
+                        command.ExecuteNonQuery();
+                    }
                 }
             }
+            catch (SqlException ex)
+            {
+                Console.Error.WriteLine($"SQLエラー: {ex.Message}");
+                throw; // 呼び出し元で処理する場合は再スロー
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"一般的なエラー: {ex.Message}");
+                throw;
+            }
         }
+
         /// <summary>
         /// ユーザーの情報の照合
         /// </summary>
@@ -397,68 +540,6 @@ namespace Wpf_exp1
             using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
             {
                 return pbkdf2.GetBytes(32); // 256ビットのハッシュ
-            }
-        }
-        /// <summary>
-        /// データベースにデータを書き込みます（INSERT, UPDATE, DELETEなどのSQLコマンドを実行）。
-        /// </summary>
-        /// <param name="commandText">実行するSQLコマンド文字列。</param>
-        /// <param name="parameters">SQLコマンドに渡すパラメーターの配列。</param>
-        /// <returns>影響を受けた行数。</returns>
-        public int SetData(string commandText, params SqlParameter[] parameters)
-        {
-            int rowsAffected = 0;
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    connection.Open();
-                    using (SqlCommand command = new SqlCommand(commandText, connection))
-                    {
-                        // パラメータを追加
-                        if (parameters != null)
-                        {
-                            command.Parameters.AddRange(parameters);
-                        }
-                        // SQLコマンドを実行し、影響を受けた行数を取得
-                        rowsAffected = command.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (SqlException ex)
-            {
-                // SQL関連のエラー処理
-                //LogError(ex);
-                throw new ApplicationException("データベース操作中にエラーが発生しました。", ex);
-            }
-            catch (InvalidOperationException ex)
-            {
-                // 接続状態やコマンドの状態に関連するエラー処理
-                //LogError(ex);
-                throw new ApplicationException("データベース接続の状態に問題があります。", ex);
-            }
-            catch (Exception ex)
-            {
-                // その他の一般的なエラー処理
-                //LogError(ex);
-                throw new ApplicationException("予期しないエラーが発生しました。", ex);
-            }
-            return rowsAffected;
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="query"></param>
-        /// <param name="parameters"></param>
-        /// <param name="connection"></param>
-        /// <param name="transaction"></param>
-        /// <returns></returns>
-        private int SetData(string query, SqlParameter[] parameters, SqlConnection connection, SqlTransaction transaction)
-        {
-            using (var command = new SqlCommand(query, connection, transaction))
-            {
-                command.Parameters.AddRange(parameters);
-                return command.ExecuteNonQuery();
             }
         }
     }

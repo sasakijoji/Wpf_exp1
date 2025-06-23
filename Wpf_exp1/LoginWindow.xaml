@@ -1,18 +1,23 @@
-﻿<Window x:Class="Wpf_exp1.LoginWindow"
+﻿<Window x:Name="LoginWindow1" x:Class="Wpf_exp1.LoginWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wpf_exp1"
-        mc:Ignorable="d"
-        Title="LoginWindow" Height="219" Width="383">
+        mc:Ignorable="d" Height="219" Width="383" ResizeMode="NoResize">
     <Grid RenderTransformOrigin="0.513,0.501">
-        <TextBox x:Name="txtbox_UserName" HorizontalAlignment="Center" Margin="0,61,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="237"/>
-        <TextBox x:Name="txtbox_PassWord" HorizontalAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Top" Width="237" Margin="0,111,0,0"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="187*"/>
+            <ColumnDefinition Width="196*"/>
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="txtbox_UserName" HorizontalAlignment="Left" Margin="73,61,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="237" Grid.ColumnSpan="2"/>
+        <TextBox x:Name="txtbox_PassWord" HorizontalAlignment="Left" TextWrapping="Wrap" VerticalAlignment="Top" Width="237" Margin="73,111,0,0" Grid.ColumnSpan="2"/>
         <Label x:Name="lbl_UserName" Content="ユーザーネーム" HorizontalAlignment="Left" Margin="73,35,0,0" VerticalAlignment="Top"/>
         <Label x:Name="lbl_Password" Content="パスワード" HorizontalAlignment="Left" Margin="71,84,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.074,0.506"/>
         <Button x:Name="btn_Login" Content="ログイン" HorizontalAlignment="Left" Margin="95,147,0,0" VerticalAlignment="Top" Width="65" Click="btn_Login_Click" IsDefault="True"/>
-        <Button x:Name="btn_quit" Content="終了" HorizontalAlignment="Left" Margin="211,147,0,0" VerticalAlignment="Top" Width="65" Click="btn_quit_Click"/>
+        <Button x:Name="btn_quit" Content="終了" HorizontalAlignment="Left" Margin="24,147,0,0" VerticalAlignment="Top" Width="65" Click="btn_quit_Click" Grid.Column="1"/>
+        <CheckBox x:Name="chkBox_ShowPassword" Grid.Column="1" Content="パスワードを表示" HorizontalAlignment="Left" Margin="26,86,0,0" VerticalAlignment="Top" Checked="chkBox_ShowPassword_Checked" Unchecked="chkBox_ShowPassword_Unchecked"/>
+        <PasswordBox x:Name="pssBox" Grid.ColumnSpan="2" HorizontalAlignment="Left" Margin="73,111,0,0" VerticalAlignment="Top" Width="237"/>
 
     </Grid>
 </Window>
