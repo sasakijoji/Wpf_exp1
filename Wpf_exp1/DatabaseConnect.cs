@@ -252,8 +252,13 @@ namespace Wpf_exp1
             }
         }
 
-        /// sqlServerへのデータ新規登録処理
+        /// <summary>
+        ///  sqlServerへのデータ新規登録処理
         /// </summary>
+        /// <param name="name">名前</param>
+        /// <param name="age">年齢</param>
+        /// <param name="Address">住所</param>
+        /// <returns></returns>
         public bool InsertClientData(string name, string age, string Address)
         {
             // 挿入するSQLコマンドを定義

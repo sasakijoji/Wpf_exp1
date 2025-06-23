@@ -195,6 +195,12 @@ namespace Wpf_exp1
             if (isInteger)
             {
                 //年齢チェック承認
+                var res = CustomerManager.ValidateAge(result); // 年齢の検証を行う
+                if (!res.IsValid) // 年齢の検証を行う
+                {
+                    //MessageBox.Show(res.ErrorMessage ?? "年齢の入力に誤りがあります。", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false; 
+                }
                 return true;
             }
             else
@@ -224,7 +230,10 @@ namespace Wpf_exp1
         /// </summary>
         private void InsertClientData()
         {
-            this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
+            if (false == this.CheckTextBoxInput()) // テキストボックスの入力内容を検証
+            {
+                return; //処理を抜ける
+            } 
             ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if (dataAccess.InsertClientData(this.txtbox_Name.Text.Trim(),
                 this.txtbox_Age.Text.Trim(),this.txtbox_Address.Text.Trim()))
@@ -335,7 +344,10 @@ namespace Wpf_exp1
                 MessageBox.Show("更新するデータが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
+            if (false == this.CheckTextBoxInput()) // テキストボックスの入力内容を検証
+            {
+                return; //処理を抜ける
+            }
             // SqlServerDataAccess クラスのインスタンスを生成
             ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if (dataAccess.EditClientData(this.txtbox_Name.Text.Trim(),
@@ -383,26 +395,27 @@ namespace Wpf_exp1
         /// <summary>
         /// checkTextBoxInputメソッドは、テキストボックスの入力内容を検証します。
         /// </summary>
-        private void CheckTextBoxInput()
+        private bool CheckTextBoxInput()
         {
             // 名前が未入力であれば処理を抜ける
             if (string.IsNullOrEmpty(this.txtbox_Name.Text))
             {
                 MessageBox.Show("名前を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return; // 名前が未入力であれば処理を抜ける
+                return false; // 名前が未入力であれば処理を抜ける
             }
             //年齢の型チェック
             if (!this.CheckAge(this.txtbox_Age.Text))
             {
                 MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;//年齢認証却下でであれば処理を抜ける
+                return false;//年齢認証却下でであれば処理を抜ける
             }
             // 住所が未入力であれば処理を抜ける
             if (string.IsNullOrEmpty(this.txtbox_Address.Text))
             {
                 MessageBox.Show("住所を入力してください", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                return; // 住所が未入力であれば処理を抜ける
+                return false; // 住所が未入力であれば処理を抜ける
             }
+            return true;
         }
         /// <summary>
         /// データの選択状態が変わった際に発生するイベント
