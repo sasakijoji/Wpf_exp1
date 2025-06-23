@@ -41,7 +41,7 @@ namespace Wpf_exp1
       　//カレントIDを保持する変数
         private int currentId = 0; // 現在の行データのIDを保持する変数
         private bool beginEdit = false; // 編集開始フラグ
-        private string userName;
+        private readonly string userName;
 
         /// <summary>
         /// メイン画面
@@ -81,7 +81,7 @@ namespace Wpf_exp1
         /// データの画面表示
         /// </summary>
         private void DisplayDebug() {
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
 
             // GetData メソッドを呼び出し、結果を取得
             DataTable data = dataAccess.GetClientsData();
@@ -125,7 +125,7 @@ namespace Wpf_exp1
         /// </summary>
         private void DisplayData()
         {
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
 
             // GetData メソッドを呼び出し、結果を取得
             DataTable data = dataAccess.GetClientsData();
@@ -225,7 +225,7 @@ namespace Wpf_exp1
         private void InsertClientData()
         {
             this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if (dataAccess.InsertClientData(this.txtbox_Name.Text.Trim(),
                 this.txtbox_Age.Text.Trim(),this.txtbox_Address.Text.Trim()))
             {
@@ -259,7 +259,7 @@ namespace Wpf_exp1
         private bool LockClientRecord()
         {
             // SqlServerDataAccess クラスのインスタンスを生成
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if (this.currentId == 0) // 現在のIDが0の場合は何もロックしない
             {
                 MessageBox.Show("データが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -286,7 +286,7 @@ namespace Wpf_exp1
         private void DeleteClientData()
         {
             // SqlServerDataAccess クラスのインスタンスを生成
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if(false == this.LockClientRecord()) // レコードをロックできなかった場合は削除しない
             {
                 return; // ロックに失敗した場合は処理を中断
@@ -337,7 +337,7 @@ namespace Wpf_exp1
             }
             this.CheckTextBoxInput(); // テキストボックスの入力内容を検証
             // SqlServerDataAccess クラスのインスタンスを生成
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             if (dataAccess.EditClientData(this.txtbox_Name.Text.Trim(),
                 this.txtbox_Age.Text.Trim(),
                 this.txtbox_Address.Text.Trim()
@@ -470,7 +470,7 @@ namespace Wpf_exp1
         {
             if (this.beginEdit) 
             {
-                SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+                ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
                 dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
             }
                 this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
@@ -494,7 +494,7 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
+            ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
             // 編集モードに入る前に、現在のレコードをロックする
             if (false == this.LockClientRecord()) // レコードをロックできなかった場合は削除しない
             {

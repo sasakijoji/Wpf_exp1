@@ -61,8 +61,9 @@ namespace Wpf_exp1
             }
 
             this.UserName = this.txtbox_UserName.Text.Trim(); // ユーザー名を取得
-            SqlServerDataAccess dataAccess = new SqlServerDataAccess();
-            DataTable = dataAccess.GetUserID(this.UserName, this.Password);
+            UserDataBaseAccess userDataAccess = new UserDataBaseAccess();
+            DataTable = userDataAccess.GetUserID(this.UserName, this.Password);
+
             if (DataTable.Rows.Count <= 0)
             {
                 MessageBox.Show("ユーザー名またはパスワードが正しくありません。",

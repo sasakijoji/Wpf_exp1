@@ -20,14 +20,14 @@ namespace Wpf_exp1
     /// <summary>
     /// サーバーへのデータアクセスを提供するクラスです。
     /// </summary>
-    public class SqlServerDataAccess
+    public class ClientDataBaseAccess
     {
         /// <summary>
         /// 接続文字列を格納するフィールド
         /// </summary>
         private readonly string _connectionString;
 
-        public SqlServerDataAccess()
+        public ClientDataBaseAccess()
         {
             _connectionString = System.Configuration.ConfigurationManager.ConnectionStrings["ClientDataConnection"].ConnectionString;
         }
