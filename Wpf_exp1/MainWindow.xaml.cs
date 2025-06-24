@@ -35,12 +35,21 @@ namespace Wpf_exp1
         //private string age = "";//年齢
         //private string address = "";//住所
         // 新規か登録かのモードを定義    
-        private const int NEW_MODE = 0; // 新規登録モード
-        private const int EDIT_MODE = 1; // 編集モード
-        private int editMode = NEW_MODE; // 編集モードのフラグ（0: 新規登録, 1: 編集）
+        /// <summary>
+        /// エディットモードの列挙型
+        /// </summary>
+        public enum EditMode
+        {
+            New = 0,
+            Edit = 1
+        }
+        private EditMode editMode = EditMode.New; // 編集モードのフラグ（0: 新規登録, 1: 編集）
       　//カレントIDを保持する変数
-        private int currentId = 0; // 現在の行データのIDを保持する変数
-        private bool beginEdit = false; // 編集開始フラグ
+        private int currentId = 0; // 現在の行データのIDを保持する変数 
+        // TODO:今後はカレントIDをこのまま設計でよいか検討する必要あり(No.0001)
+
+        public enum EditorState { Idle, Editing }// 編集状態を表す列挙型
+        private EditorState beginEdit = EditorState.Idle; // 編集開始フラグ
         private readonly string userName;
 
         /// <summary>
@@ -180,7 +189,7 @@ namespace Wpf_exp1
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void TextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
+       {
         }
 
 
@@ -191,23 +200,25 @@ namespace Wpf_exp1
         /// <returns>false=数値ではない true=数値</returns>
         private bool CheckAge(string input) 
         {
-            bool isInteger = int.TryParse(input, out int result);
-            if (isInteger)
+            if (!int.TryParse(input, out int result))
             {
-                //年齢チェック承認
-                var res = CustomerManager.ValidateAge(result); // 年齢の検証を行う
-                if (!res.IsValid) // 年齢の検証を行う
-                {
-                    //MessageBox.Show(res.ErrorMessage ?? "年齢の入力に誤りがあります。", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return false; 
-                }
-                return true;
-            }
-            else
-            {
-                //年齢チェック却下
+                MessageBox.Show("年齢は整数値で入力してください。");
                 return false;
             }
+
+            var ageRange = (CustomerManager.AgeRange)result;
+            var res = CustomerManager.ValidateAge(ageRange);
+            if (!res.IsValid)
+            {
+                MessageBox.Show(
+                res.ErrorMessage ?? "年齢の入力に誤りがあります。",
+                "入力エラー",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error
+);
+                return false;
+            }
+            return true;
         }
         /// <summary>
         /// 登録ボタンクリックイベント
@@ -216,7 +227,7 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnRegistration_Click(object sender, RoutedEventArgs e)
         {
-            if (this.editMode == MainWindow.NEW_MODE)
+            if (this.editMode == EditMode.New)
             {
                 InsertClientData(); // 新規登録処理を呼び出す
             }
@@ -300,20 +311,9 @@ namespace Wpf_exp1
             {
                 return; // ロックに失敗した場合は処理を中断
             }
-            // 削除する SQL コマンドを定義
-            string deleteQuery = "DELETE FROM baseData WHERE client_name = @Name AND client_age = @Age AND client_address = @Address";
-
-            // パラメーターを作成
-            SqlParameter[] deleteParams = new SqlParameter[]
-            {
-             new SqlParameter("@Name", this.txtbox_Name.Text), // 名前
-             new SqlParameter("@Age", this.txtbox_Age.Text),   // 年齢
-             new SqlParameter("@Address", this.txtbox_Address.Text) // 住所
-            };
 
             // SetData 関数を呼び出して削除を実行
-            int affectedRows = dataAccess.SetData(deleteQuery, deleteParams);
-
+            int affectedRows = dataAccess.DeleteClientData(this.currentId);
             if (affectedRows > 0)
             {
                 Console.WriteLine($"{affectedRows} 行が削除されました。");
@@ -406,7 +406,6 @@ namespace Wpf_exp1
             //年齢の型チェック
             if (!this.CheckAge(this.txtbox_Age.Text))
             {
-                MessageBox.Show("年齢が正しくありません", "注意", MessageBoxButton.OK, MessageBoxImage.Information);
                 return false;//年齢認証却下でであれば処理を抜ける
             }
             // 住所が未入力であれば処理を抜ける
@@ -446,7 +445,7 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnNewData_Click(object sender, RoutedEventArgs e)
         {
-            this.editMode = 0; // 新規登録モードに設定
+            this.editMode = EditMode.New; // 新規登録モードに設定
             this.txtbox_Name.Focus(); // 名前のテキストボックスにフォーカスを当てる
             this.txtbox_Name.CaretIndex = this.txtbox_Name.Text.Length; // テキストボックスのカーソルを最後に移動
             this.btnRegistration.IsEnabled = true;//登録ボタンの有効化
@@ -481,23 +480,23 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
-            if (this.beginEdit) 
+            if (this.beginEdit == EditorState.Editing) 
             {
                 ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
                 dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
             }
-                this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
-                this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化
-                this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
-                this.ClientDataGrid.IsEnabled = true; // DataGridの無効化
-                this.InitializeTextBoxes(); // テキストボックスの初期化
-                int rowIndex = ClientDataGrid.Items.IndexOf(ClientDataGrid.SelectedItem); // 選択された行のインデックスを取得  
-                //UIの更新                                                                          
-                if (0 <= rowIndex && rowIndex < ClientDataGrid.Items.Count)
-                {
-                    ClientDataGrid.SelectedIndex = rowIndex;
-                    ClientDataGrid.ScrollIntoView(ClientDataGrid.Items[rowIndex]);
-                }
+            this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
+            this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化
+            this.btnCancel.IsEnabled = false; // キャンセルボタンの無効化
+            this.ClientDataGrid.IsEnabled = true; // DataGridの無効化
+            this.InitializeTextBoxes(); // テキストボックスの初期化
+            int rowIndex = ClientDataGrid.Items.IndexOf(ClientDataGrid.SelectedItem); // 選択された行のインデックスを取得  
+            //UIの更新                                                                          
+            if (0 <= rowIndex && rowIndex < ClientDataGrid.Items.Count)
+            {
+                ClientDataGrid.SelectedIndex = rowIndex;
+                ClientDataGrid.ScrollIntoView(ClientDataGrid.Items[rowIndex]);
+            }
 
         }
         /// <summary>
@@ -513,8 +512,9 @@ namespace Wpf_exp1
             {
                 return; // ロックに失敗した場合は処理を中断
             }
-            this.editMode =  MainWindow.EDIT_MODE; // 編集モードに設定
-            this.beginEdit = true; // 編集開始フラグを立てる
+            this.editMode =  EditMode.Edit; // 編集モードに設定
+            this.beginEdit = EditorState.Editing; // 編集開始フラグを立てる
+
             this.txtbox_Name.IsEnabled = true; // 名前のテキストボックスを有効化
             this.txtbox_Age.IsEnabled = true; // 年齢のテキストボックスを有効化
             this.txtbox_Address.IsEnabled = true; // 住所のテキストボックスを有効化
