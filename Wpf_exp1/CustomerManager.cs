@@ -7,11 +7,23 @@ using System.Windows;
 
 namespace Wpf_exp1
 {
+    public class ClientDto
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = default!;
+        public int Age { get; init; }
+        public string Address { get; init; } = default!;
+    }
     public class ValidationResult
     {
         public bool IsValid { get; }
         public string? ErrorMessage { get; }
 
+        /// <summary>
+        /// ValidationResult クラスのコンストラクタ
+        /// </summary>
+        /// <param name="isValid"></param>
+        /// <param name="errorMessage"></param>
         public ValidationResult(bool isValid, string? errorMessage = null)
         {
             IsValid = isValid;
@@ -23,35 +35,59 @@ namespace Wpf_exp1
     /// </summary>
     internal class CustomerManager
     {
+
+        private int _currentId;
+        public int CurrentId
+        {
+            get => _currentId;
+            private set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), "IDは0以上である必要があります。");
+                _currentId = value;
+            }
+        }
+
+        public CustomerManager()
+        {
+            CurrentId = 0;
+        }
+
+        public void SelectClient(int clientId)
+        {
+            CurrentId = clientId;
+            // 選択に関連するビジネスロジックの実行
+        }
+
+        public void UpdateClientData(ClientDto dto)
+        {
+            if (dto.Id != CurrentId)
+                throw new InvalidOperationException("更新対象Clientが一致しません。");
+            // データ更新処理
+        }
+
+        /// <summary>
+        /// 年齢の範囲を定義する列挙型
+        /// </summary>
+        public enum AgeRange
+        {
+            Minimum = 0, // 最小の年齢
+            Maximum = 120 // 最高年齢
+        }
+
+
         /// <summary>
         /// 年齢のバリデーションチェック
         /// </summary>
         /// <param name="age"></param>
         /// <returns></returns>
-        public static ValidationResult ValidateAge(int age)
+        public static ValidationResult ValidateAge(AgeRange age)
         {
-            if (age < 0 || age > 120)
+            if (age < AgeRange.Minimum || age > AgeRange.Maximum) 
+            { 
                 return new ValidationResult(false, "年齢は0〜120の間で指定してください。");
+            }
             return new ValidationResult(true);
         }
-        ///// <summary>
-        ///// 年齢の妥当性を検証します。
-        ///// </summary>
-        ///// <param name="age"></param>
-        ///// <returns></returns>
-        //public static bool ValidateAge(int age)
-        //{
-        //    if (age < 0 || age > 120)
-        //    {
-        //        MessageBox.Show(
-        //        "年齢は 0～120 の範囲で入力してください。",
-        //        "入力エラー",
-        //        MessageBoxButton.OK,
-        //        MessageBoxImage.Warning);
-        //        return false;
-        //    }
-        //    return true;
-        //}
-          
     }
 }
