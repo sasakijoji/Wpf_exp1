@@ -21,7 +21,7 @@ namespace Wpf_exp1
     /// </summary>
     public partial class LoginWindow : Window
     {
-        private DataTable DataTable { get; set; } = new DataTable(); // 修正: プロパティを初期化
+        // private DataTable DataTable { get; set; } = new DataTable(); // 修正: プロパティを初期化
         private string UserName { get; set; } = string.Empty; // 修正: プロパティを初期化
         private string Password { get; set; } = string.Empty; // 修正: プロパティを初期化
 
@@ -30,7 +30,8 @@ namespace Wpf_exp1
             InitializeComponent();
             this.txtbox_PassWord.Visibility = Visibility.Collapsed; // パスワードを非表示
 
-            // ユーザーをデータベースに挿入
+            // NOTE: 以下のコードは、デバッグ用のサンプルです。 ユーザーをデータベースに挿入する際には今のところ画面はないので、直接コードを実行してユーザーを登録することができます。
+            //  
             //SqlServerDataAccess dataAccess = new SqlServerDataAccess();
             //dataAccess.InsertUser("user2", "ilverde00");
 
@@ -59,7 +60,7 @@ namespace Wpf_exp1
             {
                 this.Password = pssBox.Password;
             }
-
+            DataTable DataTable = new DataTable();
             this.UserName = this.txtbox_UserName.Text.Trim(); // ユーザー名を取得
             UserDataBaseAccess userDataAccess = new UserDataBaseAccess();
             DataTable = userDataAccess.GetUserID(this.UserName, this.Password);

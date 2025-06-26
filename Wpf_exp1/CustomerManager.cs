@@ -33,10 +33,23 @@ namespace Wpf_exp1
     /// <summary>
     /// BLL (Business Logic Layer) のクラス
     /// </summary>
-    internal class CustomerManager
+    public class CustomerManager
     {
-
+        /// <summary>
+        /// 
+        /// </summary>
         private int _currentId;
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        public CustomerManager()
+        {
+            CurrentId = 0;
+        }
+
+        /// <summary>
+        /// カレントIDを取得する変数
+        /// </summary>
         public int CurrentId
         {
             get => _currentId;
@@ -48,10 +61,16 @@ namespace Wpf_exp1
             }
         }
 
-        public CustomerManager()
+        /// <summary>
+        /// SetCurrentId メソッドをインスタンスメソッドに変更
+        /// </summary>
+        /// <param name="id"></param>
+        public void SetCurrentId(int id)
         {
-            CurrentId = 0;
+            // 必要ならバリデーション
+            CurrentId = id;
         }
+
 
         public void SelectClient(int clientId)
         {
@@ -83,8 +102,8 @@ namespace Wpf_exp1
         /// <returns></returns>
         public static ValidationResult ValidateAge(AgeRange age)
         {
-            if (age < AgeRange.Minimum || age > AgeRange.Maximum) 
-            { 
+            if (age < AgeRange.Minimum || age > AgeRange.Maximum)
+            {
                 return new ValidationResult(false, "年齢は0〜120の間で指定してください。");
             }
             return new ValidationResult(true);

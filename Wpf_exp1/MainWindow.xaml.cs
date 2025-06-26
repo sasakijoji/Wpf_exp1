@@ -45,15 +45,13 @@ namespace Wpf_exp1
         }
         private EditMode editMode = EditMode.New; // 編集モードのフラグ（0: 新規登録, 1: 編集）
       　//カレントIDを保持する変数
-        private int currentId = 0; // 現在の行データのIDを保持する変数 
-        // TODO:今後はカレントIDをこのまま設計でよいか検討する必要あり(No.0001)
-
-        public enum EditorState { Idle, Editing }// 編集状態を表す列挙型
-        private EditorState beginEdit = EditorState.Idle; // 編集開始フラグ
+        private CustomerManager customerManager; // CustomerManagerのインスタンスを作成
+        private enum EditorState { Idle, Editing }// 編集状態を表す列挙型
+        private EditorState beginEdit = EditorState.Idle; // 編集開始フラグ　注意※　新規登録時は編集開始フラグは立てない
         private readonly string userName;
 
         /// <summary>
-        /// メイン画面
+        /// メイン画面　コンストラクタ
         /// </summary>
         /// <param name="userName">ログインユーザーの名前</param>
         public MainWindow(string userName)
@@ -62,7 +60,7 @@ namespace Wpf_exp1
             InitializeComponent();
             this.InitializeButtons(); // ボタンの初期化
             this.InitializeTextBoxes(); // テキストボックスの初期化
-
+            customerManager = new CustomerManager();// CustomerManagerのインスタンスを作成
             ///UIにてファイルの内容を表示
             DisplayDebug();// デバッグ用の表示メソッドを呼び出す
             this.ClientDataGrid.SelectionMode = DataGridSelectionMode.Single; // 単一選択モードに設定
@@ -280,16 +278,16 @@ namespace Wpf_exp1
         {
             // SqlServerDataAccess クラスのインスタンスを生成
             ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
-            if (this.currentId == 0) // 現在のIDが0の場合は何もロックしない
+            if (this.customerManager.CurrentId == 0) // 現在のIDが0の場合は何もロックしない
             {
                 MessageBox.Show("データが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
-            if (!dataAccess.SetClientRecordLock(this.currentId.ToString(), this.userName))
+            if (!dataAccess.SetClientRecordLock(this.customerManager.CurrentId.ToString(), this.userName))
             {
                 // GetData メソッドを呼び出し、結果を取得
                 DataTable data = dataAccess.GetClientsData();
-                var match = data.AsEnumerable().FirstOrDefault(r => r.Field<int>("client_id") == this.currentId);
+                var match = data.AsEnumerable().FirstOrDefault(r => r.Field<int>("client_id") == this.customerManager.CurrentId);
                 string byUser = ""; // 編集を試みたユーザー名
                 if (match != null)
                 {
@@ -313,7 +311,7 @@ namespace Wpf_exp1
             }
 
             // SetData 関数を呼び出して削除を実行
-            int affectedRows = dataAccess.DeleteClientData(this.currentId);
+            int affectedRows = dataAccess.DeleteClientData(this.customerManager.CurrentId);
             if (affectedRows > 0)
             {
                 Console.WriteLine($"{affectedRows} 行が削除されました。");
@@ -339,7 +337,7 @@ namespace Wpf_exp1
         /// </summary>
         private void EditClientData()
         {
-            if (this.currentId == 0) // 現在のIDが0の場合は何も更新しない
+            if (this.customerManager.CurrentId == 0) // 現在のIDが0の場合は何も更新しない
             {
                 MessageBox.Show("更新するデータが選択されていません。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -353,7 +351,7 @@ namespace Wpf_exp1
             if (dataAccess.EditClientData(this.txtbox_Name.Text.Trim(),
                 this.txtbox_Age.Text.Trim(),
                 this.txtbox_Address.Text.Trim()
-                ,this.currentId))
+                ,this.customerManager.CurrentId))
             {
                 // テキストボックスをクリア
                 //this.txtbox_Name.Text = "";
@@ -377,7 +375,7 @@ namespace Wpf_exp1
                 MessageBox.Show("データの更新に失敗しました。", "警告", MessageBoxButton.OK, MessageBoxImage.Error);
                 Console.WriteLine("データの更新に失敗しました。");
             }
-            dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+            dataAccess.ReleaseClientRecordLock(this.customerManager.CurrentId.ToString()); // 編集終了時にロックを解除
   
             int rowIndex = ClientDataGrid.Items.IndexOf(ClientDataGrid.SelectedItem); // 選択された行のインデックスを取得  
             //UIの更新                                                                          
@@ -423,7 +421,6 @@ namespace Wpf_exp1
         /// <param name="e"></param>
         private void ClientDataGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
         {
-            
             if (this.btnNewData.IsEnabled == true) //もし新規ボタンが有効なら
             {
                 this.btnEdit.IsEnabled = true; // 編集ボタンの有効化
@@ -435,7 +432,7 @@ namespace Wpf_exp1
                 this.txtbox_Name.Text = selectedRow.Row["client_name"].ToString(); // 名前
                 this.txtbox_Age.Text = selectedRow.Row["client_age"].ToString(); // 年齢
                 this.txtbox_Address.Text = selectedRow.Row["client_address"].ToString(); // 住所
-                this.currentId = Convert.ToInt32(selectedRow.Row["client_id"]); // 現在のIDを取得
+                this.customerManager.SetCurrentId(Convert.ToInt32(selectedRow.Row["client_id"])); // 現在のIDを取得
             }
         }
         /// <summary>
@@ -483,7 +480,7 @@ namespace Wpf_exp1
             if (this.beginEdit == EditorState.Editing) 
             {
                 ClientDataBaseAccess dataAccess = new ClientDataBaseAccess();
-                dataAccess.ReleaseClientRecordLock(this.currentId.ToString()); // 編集終了時にロックを解除
+                dataAccess.ReleaseClientRecordLock(this.customerManager.CurrentId.ToString()); // 編集終了時にロックを解除
             }
             this.btnNewData.IsEnabled = true; // 新規データ登録ボタンの有効化
             this.btnRegistration.IsEnabled = false; // 登録ボタンの無効化

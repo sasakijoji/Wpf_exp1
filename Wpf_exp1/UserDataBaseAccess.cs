@@ -21,10 +21,10 @@ namespace Wpf_exp1
             _connectionString = System.Configuration.ConfigurationManager.ConnectionStrings["ClientDataConnection"].ConnectionString;
         }
         /// <summary>
-        /// ユーザーをデータベースに挿入します。
+        /// ユーザーをデータベースに挿入します。(ユーザー登録画面はいまのところないので直に値を引数にいれて使う)
         /// </summary>
-        /// <param name="userName"></param>
-        /// <param name="password"></param>
+        /// <param name="userName">ユーザー名</param>
+        /// <param name="password">パスワード</param>
         public void InsertUser(string userName, string password)
         {
             try
@@ -71,68 +71,96 @@ namespace Wpf_exp1
                 throw;
             }
         }
+
         /// <summary>
-        /// ユーザーの情報の照合
+        /// ユーザー名とパスワードを照合し、ユーザーIDを取得します。
         /// </summary>
         /// <param name="userName"></param>
         /// <param name="password"></param>
         /// <returns></returns>
         public DataTable GetUserID(string userName, string password)
         {
-            DataTable dataTable = new DataTable();
-            byte[] storedPasswordHashBytes = null;
-            byte[] storedSalt = null;
+            var dataTable = new DataTable();
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                connection.Open();
-                string query = "SELECT PasswordHash, Salt FROM Users WHERE UserName = @UserName";
+                var (storedHash, storedSalt) = GetStoredCredentials(userName);
+                if (storedHash == null || storedSalt == null)
+                    return dataTable; // ユーザー不存在／不完全なレコード
 
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.Add("@UserName", SqlDbType.NVarChar, 256).Value = userName;
+                if (!ValidatePassword(password, storedHash, storedSalt))
+                    return dataTable; // パスワード不一致
 
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            if (reader["PasswordHash"] != DBNull.Value)
-                            {
-                                storedPasswordHashBytes = (byte[])reader["PasswordHash"];
-                            }
-                            if (reader["Salt"] != DBNull.Value)
-                            {
-                                storedSalt = ((Guid)reader["Salt"]).ToByteArray();
-                            }
-                        }
-                    }
-                }
+                dataTable = GetUserRecord(userName);
+                return dataTable;
             }
-            if (storedPasswordHashBytes != null && storedSalt != null)
+            catch (SqlException sqlEx)
             {
-                byte[] hashedPasswordFromInputBytes = HashPassword(password, storedSalt);
-
-                if (hashedPasswordFromInputBytes.SequenceEqual(storedPasswordHashBytes))
-                {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
-                    {
-                        connection.Open();
-                        string finalQuery = "SELECT * FROM Users WHERE UserName = @UserName";
-
-                        using (SqlCommand finalCommand = new SqlCommand(finalQuery, connection))
-                        {
-                            finalCommand.Parameters.AddWithValue("@UserName", userName);
-                            using (SqlDataAdapter adapter = new SqlDataAdapter(finalCommand))
-                            {
-                                adapter.Fill(dataTable);
-                            }
-                        }
-                    }
-                }
+                // SQL関連の例外ログ
+                LogError($"SQL error in GetUserID: {sqlEx.Number} – {sqlEx.Message}");
+                throw;
             }
+            catch (Exception ex)
+            {
+                // その他の例外
+                LogError($"Unexpected error in GetUserID: {ex.Message}");
+                throw;
+            }
+        }
+
+        private (byte[] hash, byte[] salt) GetStoredCredentials(string userName)
+        {
+            const string query = "SELECT PasswordHash, Salt FROM Users WHERE UserName = @UserName";
+
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@UserName", userName);
+
+            conn.Open();
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+                return (null, null);
+
+            var hash = reader["PasswordHash"] as byte[];
+            byte[] salt = reader["Salt"] is Guid g ? g.ToByteArray() : null;
+            return (hash, salt);
+        }
+
+        private bool ValidatePassword(string password, byte[] storedHash, byte[] storedSalt)
+        {
+            var inputHash = HashPassword(password, storedSalt);
+            return inputHash.SequenceEqual(storedHash);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="userName"></param>
+        /// <returns></returns>
+        private DataTable GetUserRecord(string userName)
+        {
+            const string query = "SELECT * FROM Users WHERE UserName = @UserName";
+            var dataTable = new DataTable();
+
+            using var conn = new SqlConnection(_connectionString);
+            using var cmd = new SqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@UserName", userName);
+
+            conn.Open();
+            using var adapter = new SqlDataAdapter(cmd);
+            adapter.Fill(dataTable);
 
             return dataTable;
         }
+        /// <summary>
+        /// エラーログを出力するメソッド
+        /// </summary>
+        /// <param name="message"></param>
+        private void LogError(string message)
+        {
+            // ログフレームワークに出力する場所（例：Serilog, NLog など）
+            Console.Error.WriteLine(message);
+        }
+
         // パスワードをハッシュ化する関数 (byte[]を返すように変更)
         // **重要: 本番環境ではPBKDF2, bcrypt, scrypt, Argon2などを利用してください**
         private byte[] HashPassword(string password, byte[] salt, int iterations = 10000)

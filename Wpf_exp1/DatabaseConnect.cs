@@ -340,7 +340,29 @@ namespace Wpf_exp1
                 }
             }
         }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="currentId"></param>
+        /// <param name="name"></param>
+        /// <param name="age"></param>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        public int DeleteClientData(int currentId)
+        {
+            // 削除する SQL コマンドを定義
+            string deleteQuery = "DELETE FROM baseData WHERE client_id = @id";
 
+            // パラメーターを作成
+            SqlParameter[] deleteParams = new SqlParameter[]
+            {
+                 new SqlParameter("@id", currentId) // 住所
+            };
+
+            // SetData 関数を呼び出して削除を実行
+            int affectedRows = SetData(deleteQuery, deleteParams);
+            return affectedRows; // 影響を受けた行数を返す
+        }
 
         /// <summary>
         /// データベースにデータを書き込みます（INSERT, UPDATE, DELETEなどのSQLコマンドを実行）。
@@ -348,7 +370,7 @@ namespace Wpf_exp1
         /// <param name="commandText">実行するSQLコマンド文字列。</param>
         /// <param name="parameters">SQLコマンドに渡すパラメーターの配列。</param>
         /// <returns>影響を受けた行数。</returns>
-        public int SetData(string commandText, params SqlParameter[] parameters)
+        private int SetData(string commandText, params SqlParameter[] parameters)
         {
             int rowsAffected = 0;
             try
@@ -421,130 +443,6 @@ namespace Wpf_exp1
                 // その他の予期しない例外
                 Console.Error.WriteLine($"[予期せぬエラー] SetData: {ex.Message}");
                 throw;
-            }
-        }
-        /// <summary>
-        /// ユーザーをデータベースに挿入します。
-        /// </summary>
-        /// <param name="userName"></param>
-        /// <param name="password"></param>
-        public void InsertUser(string userName, string password)
-        {
-            try
-            {
-                // ソルトを生成
-                Guid salt = PasswordUtility.GenerateSalt();
-
-                // パスワードをハッシュ化
-                byte[] passwordHash = PasswordUtility.HashPassword(password, salt);
-
-                // 現在の日付と時刻を設定
-                DateTime createdAt = DateTime.Now;
-
-                // SQLクエリを構築
-                string query = @"
-                INSERT INTO [dbo].[Users] ([UserName], [PasswordHash], [CreatedAt], [Salt])
-                VALUES (@UserName, @PasswordHash, @CreatedAt, @Salt) ";
-
-                // SQL接続とコマンドを設定
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        // パラメータの設定
-                        command.Parameters.AddWithValue("@UserName", userName);
-                        command.Parameters.AddWithValue("@PasswordHash", passwordHash);
-                        command.Parameters.AddWithValue("@CreatedAt", createdAt);
-                        command.Parameters.AddWithValue("@Salt", salt);
-
-                        // SQL接続を開いて実行
-                        connection.Open();
-                        command.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (SqlException ex)
-            {
-                Console.Error.WriteLine($"SQLエラー: {ex.Message}");
-                throw; // 呼び出し元で処理する場合は再スロー
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"一般的なエラー: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// ユーザーの情報の照合
-        /// </summary>
-        /// <param name="userName"></param>
-        /// <param name="password"></param>
-        /// <returns></returns>
-        public DataTable GetUserID(string userName, string password)
-        {
-            DataTable dataTable = new DataTable();
-            byte[] storedPasswordHashBytes = null;
-            byte[] storedSalt = null;
-
-            using (SqlConnection connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
-                string query = "SELECT PasswordHash, Salt FROM Users WHERE UserName = @UserName";
-
-                using (SqlCommand command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.Add("@UserName", SqlDbType.NVarChar, 256).Value = userName;
-
-                    using (SqlDataReader reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            if (reader["PasswordHash"] != DBNull.Value)
-                            {
-                                storedPasswordHashBytes = (byte[])reader["PasswordHash"];
-                            }
-                            if (reader["Salt"] != DBNull.Value)
-                            {
-                                storedSalt = ((Guid)reader["Salt"]).ToByteArray();
-                            }
-                        }
-                    }
-                }
-            }
-            if (storedPasswordHashBytes != null && storedSalt != null)
-            {
-                byte[] hashedPasswordFromInputBytes = HashPassword(password, storedSalt);
-
-                if (hashedPasswordFromInputBytes.SequenceEqual(storedPasswordHashBytes))
-                {
-                    using (SqlConnection connection = new SqlConnection(_connectionString))
-                    {
-                        connection.Open();
-                        string finalQuery = "SELECT * FROM Users WHERE UserName = @UserName";
-
-                        using (SqlCommand finalCommand = new SqlCommand(finalQuery, connection))
-                        {
-                            finalCommand.Parameters.AddWithValue("@UserName", userName);
-                            using (SqlDataAdapter adapter = new SqlDataAdapter(finalCommand))
-                            {
-                                adapter.Fill(dataTable);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return dataTable;
-        }
-
-        // パスワードをハッシュ化する関数 (byte[]を返すように変更)
-        // **重要: 本番環境ではPBKDF2, bcrypt, scrypt, Argon2などを利用してください**
-        private byte[] HashPassword(string password, byte[] salt, int iterations = 10000)
-        {
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
-            {
-                return pbkdf2.GetBytes(32); // 256ビットのハッシュ
             }
         }
     }
